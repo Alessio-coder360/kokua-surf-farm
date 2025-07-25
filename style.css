@@ -1,0 +1,165 @@
+/* Stili aggiuntivi per l'app Surfcamp */
+
+/* Animazioni personalizzate */
+@keyframes wave {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(5deg); }
+    75% { transform: rotate(-5deg); }
+}
+
+.wave-animation {
+    animation: wave 2s ease-in-out infinite;
+}
+
+/* Effetti hover migliorati */
+.surf-card:hover {
+    transform: translateY(-2px);
+    transition: transform 0.3s ease;
+}
+
+/* Stili per notifiche */
+.notification {
+    opacity: 0;
+    transform: translate(-50%, -20px);
+    transition: all 0.3s ease;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
+
+/* Stili responsivi migliorati */
+@media (max-width: 768px) {
+    .container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    .surf-card {
+        margin-bottom: 1rem;
+        padding: 1rem;
+    }
+    
+    h1 {
+        font-size: 2.5rem;
+    }
+    
+    h2 {
+        font-size: 1.5rem;
+    }
+}
+
+/* Stili per quiz interattivo */
+.quiz-option:disabled {
+    cursor: not-allowed;
+}
+
+.quiz-option:not(:disabled):hover {
+    transform: translateX(4px);
+    transition: transform 0.2s ease;
+}
+
+/* Stili per feedback rating */
+.feedback-btn {
+    transition: all 0.3s ease;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 50%;
+}
+
+.feedback-btn:hover {
+    transform: scale(1.2);
+}
+
+.feedback-btn.selected {
+    background-color: #fbbf24;
+    transform: scale(1.3);
+}
+
+/* Stili per admin panel */
+#admin-panel {
+    backdrop-filter: blur(5px);
+}
+
+#admin-toggle {
+    transition: all 0.3s ease;
+}
+
+#admin-toggle:hover {
+    transform: scale(1.1);
+}
+
+/* Animazioni di caricamento */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.loading {
+    animation: pulse 2s ease-in-out infinite;
+}
+
+/* Stili per bottoni social */
+.social-btn {
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.social-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Background gradient animato */
+.wave-bg {
+    background: linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #f5576c);
+    background-size: 400% 400%;
+    animation: gradientShift 15s ease infinite;
+}
+
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* Stili per form admin */
+.admin-form input,
+.admin-form textarea,
+.admin-form select {
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.admin-form input:focus,
+.admin-form textarea:focus,
+.admin-form select:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    outline: none;
+}
+
+/* Stili per card activities */
+.activity-card {
+    transition: all 0.3s ease;
+    border-left: 4px solid transparent;
+}
+
+.activity-card:hover {
+    border-left-color: #fbbf24;
+    transform: translateX(4px);
+}
+
+/* Media queries per dispositivi piccoli */
+@media (max-width: 480px) {
+    .feedback-btn {
+        font-size: 2rem;
+    }
+    
+    .social-btn {
+        font-size: 0.875rem;
+        padding: 0.75rem 1.5rem;
+    }
+    
+    #admin-panel .bg-white {
+        margin: 1rem;
+        max-height: 95vh;
+    }
+}
