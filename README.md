@@ -40,21 +40,8 @@ adminPassword: 'surfadmin2025', // Cambia questa password!
 2. Modifica il campo "Link Instagram"
 3. Salva le impostazioni
 
-### Hosting Gratuito
-Per rendere la pagina accessibile online:
 
-1. **GitHub Pages** (Gratuito):
-   - Carica i file su un repository GitHub
-   - Attiva GitHub Pages nelle impostazioni
-   - Ottieni un link pubblico
 
-2. **Netlify** (Gratuito):
-   - Trascina la cartella su netlify.com
-   - Ottieni un link pubblico istantaneamente
-
-3. **Vercel** (Gratuito):
-   - Carica su vercel.com
-   - Deploy automatico
 
 ## 📋 Struttura File
 
