@@ -1,0 +1,18 @@
+# 🔐 File con password e dati sensibili
+config.private.js
+
+# 📁 File di sistema
+.DS_Store
+Thumbs.db
+
+# 🛠️ File di sviluppo
+.vscode/
+.idea/
+*.log
+
+# 📦 Dipendenze (se usi Node.js in futuro)
+node_modules/
+package-lock.json
+
+# 🚀 File di deploy locale
+.netlify/

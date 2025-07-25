@@ -167,6 +167,15 @@
         </div>
     </div>
 
+    <!-- 🔐 Carica configurazione privata (se esiste) -->
+    <script>
+        // Tentativo di caricare config privata - fallback se non esiste
+        const script = document.createElement('script');
+        script.src = 'config.private.js';
+        script.onerror = () => console.log('🔓 Modalità demo - config privata non trovata');
+        document.head.appendChild(script);
+    </script>
+    
     <script src="script.js"></script>
 </body>
 </html>

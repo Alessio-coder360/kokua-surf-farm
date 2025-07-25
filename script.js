@@ -1,13 +1,33 @@
-// Configurazione
-const CONFIG = {
-    adminPassword: 'Surfadmin2025', // Cambia questa password!
+// Configurazione (password caricata dinamicamente)
+let CONFIG = {
+    adminPassword: 'demo123', // Fallback per GitHub (sicuro)
     instagramUrl: 'https://instagram.com/tuosurfcamp',
-    sheetId: '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms', // Sostituisci con il tuo Google Sheets ID
-    apiKey: 'AIzaSyBhuTq-RKWnRYfHq3FhO_MLIsaac-AaHlA', // Sostituisci con la tua API key
-    // Protezione accessi
-    maxVisitsPerHour: 50, // Limite visite orarie
-    accessCode: 'KOKUA2025' // Codice accesso opzionale
+    sheetId: '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms',
+    apiKey: '',
+    maxVisitsPerHour: 50,
+    accessCode: 'DEMO2025'
 };
+
+// Carica configurazione privata se esiste (solo locale)
+async function loadPrivateConfig() {
+    try {
+        const response = await fetch('config.private.js');
+        if (response.ok) {
+            const configText = await response.text();
+            // Esegui il codice per ottenere PRIVATE_CONFIG
+            eval(configText);
+            // Aggiorna CONFIG con dati privati
+            if (typeof PRIVATE_CONFIG !== 'undefined') {
+                CONFIG.adminPassword = PRIVATE_CONFIG.adminPassword || CONFIG.adminPassword;
+                CONFIG.accessCode = PRIVATE_CONFIG.accessCode || CONFIG.accessCode;
+                CONFIG.apiKey = PRIVATE_CONFIG.apiKey || CONFIG.apiKey;
+                console.log('🔐 Configurazione privata caricata');
+            }
+        }
+    } catch (error) {
+        console.log('🔓 Modalità demo - config pubblico');
+    }
+}
 
 // Stato dell'applicazione
 let appState = {
@@ -39,7 +59,8 @@ const defaultData = {
 };
 
 // Inizializzazione app
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
+    await loadPrivateConfig(); // Carica prima il config privato
     checkAccessLimits();
     initializeApp();
 });
