@@ -42,7 +42,6 @@ adminPassword: 'surfadmin2025', // Cambia questa password!
 
 
 
-
 ## 📋 Struttura File
 
 ```

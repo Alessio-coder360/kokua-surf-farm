@@ -1,30 +1,29 @@
-// Configurazione (password caricata dinamicamente)
+// Configurazione pubblica (sicura per GitHub)
 let CONFIG = {
-    adminPassword: 'demo123', // Fallback per GitHub (sicuro)
+    adminPassword: 'demo123', // Fallback per demo - sovrascritto da variabili ambiente
     instagramUrl: 'https://instagram.com/tuosurfcamp',
-    sheetId: '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms',
-    apiKey: '',
-    maxVisitsPerHour: 50,
-    accessCode: 'DEMO2025'
+    sheetId: '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms', // Google Sheets ID (pubblico)
+    apiKey: '', // API key protetta
+    // Protezione accessi
+    maxVisitsPerHour: 50, // Limite visite orarie
+    accessCode: 'DEMO2025' // Codice protetto
 };
 
-// Carica configurazione privata se esiste (solo locale)
-async function loadPrivateConfig() {
-    try {
-        const response = await fetch('config.private.js');
-        if (response.ok) {
-            const configText = await response.text();
-            // Esegui il codice per ottenere PRIVATE_CONFIG
-            eval(configText);
-            // Aggiorna CONFIG con dati privati
-            if (typeof PRIVATE_CONFIG !== 'undefined') {
-                CONFIG.adminPassword = PRIVATE_CONFIG.adminPassword || CONFIG.adminPassword;
-                CONFIG.accessCode = PRIVATE_CONFIG.accessCode || CONFIG.accessCode;
-                CONFIG.apiKey = PRIVATE_CONFIG.apiKey || CONFIG.apiKey;
-                console.log('🔐 Configurazione privata caricata');
-            }
-        }
-    } catch (error) {
+// Carica variabili d'ambiente Netlify se disponibili
+if (typeof process !== 'undefined' && process.env) {
+    CONFIG.adminPassword = process.env.VITE_ADMIN_PASSWORD || CONFIG.adminPassword;
+    CONFIG.accessCode = process.env.VITE_ACCESS_CODE || CONFIG.accessCode;
+    CONFIG.apiKey = process.env.VITE_API_KEY || CONFIG.apiKey;
+}
+
+// Aggiorna configurazione con dati privati se disponibili
+function updateConfigFromPrivate() {
+    if (typeof PRIVATE_CONFIG !== 'undefined' && PRIVATE_CONFIG) {
+        CONFIG.adminPassword = PRIVATE_CONFIG.adminPassword || CONFIG.adminPassword;
+        CONFIG.accessCode = PRIVATE_CONFIG.accessCode || CONFIG.accessCode;
+        CONFIG.apiKey = PRIVATE_CONFIG.apiKey || CONFIG.apiKey;
+        console.log('🔐 Configurazione privata caricata');
+    } else {
         console.log('🔓 Modalità demo - config pubblico');
     }
 }
@@ -59,8 +58,10 @@ const defaultData = {
 };
 
 // Inizializzazione app
-document.addEventListener('DOMContentLoaded', async function() {
-    await loadPrivateConfig(); // Carica prima il config privato
+document.addEventListener('DOMContentLoaded', function() {
+    // Aggiorna config con dati privati se disponibili
+    updateConfigFromPrivate();
+    
     checkAccessLimits();
     initializeApp();
 });
@@ -289,22 +290,30 @@ function closeAdminPanel() {
     appState.isAdminLoggedIn = false;
 }
 
+// Login admin tramite funzione serverless
 function handleAdminLogin() {
     const password = document.getElementById('admin-password').value;
-    
-    if (password === CONFIG.adminPassword) {
-        appState.isAdminLoggedIn = true;
-        // Nascondi la sezione login
-        document.getElementById('admin-login-section').classList.add('hidden');
-        // Mostra il contenuto admin
-        document.getElementById('admin-content').classList.remove('hidden');
-        loadAdminData();
-        showNotification('✅ Accesso admin effettuato!', 'success');
-    } else {
-        showNotification('❌ Password errata!', 'error');
-        // Pulisci il campo password se errata
-        document.getElementById('admin-password').value = '';
-    }
+    fetch('/.netlify/functions/check-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            appState.isAdminLoggedIn = true;
+            document.getElementById('admin-login-section').classList.add('hidden');
+            document.getElementById('admin-content').classList.remove('hidden');
+            loadAdminData();
+            showNotification('✅ Accesso admin effettuato!', 'success');
+        } else {
+            showNotification('❌ Password errata!', 'error');
+            document.getElementById('admin-password').value = '';
+        }
+    })
+    .catch(() => {
+        showNotification('⚠️ Errore di connessione al server!', 'error');
+    });
 }
 
 function loadAdminData() {
