@@ -821,11 +821,20 @@ function saveSettings() {
     if (saveBtn) saveBtn.addEventListener('click', saveSettings);
     if (!appState.isAdminLoggedIn) return;
 
-    // Salva SOLO ora il programma temporaneo
+
+    // Salva il programma sia su remoto (Netlify Function) che in localStorage (fallback)
     if (Array.isArray(appState.tempProgram)) {
         const cleanProgram = appState.tempProgram.filter(line => line && line.trim());
-        localStorage.setItem('surfcamp-program', JSON.stringify(cleanProgram));
-        console.log('[DEBUG] Programma salvato:', cleanProgram);
+        // Prova a salvare su remoto, fallback automatico su localStorage
+        saveProgram(cleanProgram, CONFIG.adminPassword).then(success => {
+            if (success) {
+                console.log('[DEBUG] Programma salvato su remoto:', cleanProgram);
+            } else {
+                console.log('[DEBUG] Programma salvato solo in localStorage:', cleanProgram);
+            }
+            // Dopo il salvataggio, aggiorna la vista pubblica
+            loadProgram().then(programma => renderProgram(programma));
+        });
     }
     // Reset tempProgram per evitare modifiche non salvate
     appState.tempProgram = null;
