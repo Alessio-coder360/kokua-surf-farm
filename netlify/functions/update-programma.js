@@ -2,6 +2,10 @@ const fs = require('fs');
 const path = require('path');
 
 exports.handler = async (event) => {
+
+  // TEST: return immediato per debug
+  return { statusCode: 200, body: 'TEST OK - Funzione raggiunta' };
+
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
