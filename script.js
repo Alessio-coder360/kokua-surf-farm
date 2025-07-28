@@ -191,7 +191,8 @@ function checkAccessLimits() {
 }
 
 function initializeApp() {
-    loadProgram();
+    // Carica il programma dal file remoto (con fallback locale)
+    loadProgram().then(programma => renderProgram(programma));
     loadQuiz();
     setupEventListeners();
     loadSettings();
@@ -220,51 +221,38 @@ function setupEventListeners() {
 }
 
 // Gestione programma
-function loadProgram() {
+
+// Rendering del programma: accetta array di oggetti [{time, activity}] o array di stringhe legacy
+function renderProgram(program) {
     const programContainer = document.getElementById('daily-program');
-    let program = [];
-    try {
-        const savedProgram = localStorage.getItem('surfcamp-program');
-        if (savedProgram) {
-            program = JSON.parse(savedProgram);
-            // Se array vuoto o contiene solo placeholder, resetta
-            const onlyEmpty = Array.isArray(program) && program.every(row => !row.trim() || row.trim() === '-' || row.trim() === ' - ');
-            if (!Array.isArray(program) || !program.length || onlyEmpty) {
-                program = [...defaultData.program];
-                localStorage.setItem('surfcamp-program', JSON.stringify(program));
-                // Ricarica la pagina per forzare la UI
-                setTimeout(() => window.location.reload(), 100);
-                return;
-            }
-        } else {
-            program = [...defaultData.program];
-            localStorage.setItem('surfcamp-program', JSON.stringify(program));
-            setTimeout(() => window.location.reload(), 100);
-            return;
-        }
-    } catch {
-        program = [...defaultData.program];
-        localStorage.setItem('surfcamp-program', JSON.stringify(program));
-        setTimeout(() => window.location.reload(), 100);
+    if (!Array.isArray(program) || !program.length) {
+        programContainer.innerHTML = '<div class="text-white text-center py-4">Nessuna attività programmata.</div>';
         return;
     }
-
-    // Crea tabella matrice: colonna sinistra Time, destra Activity
     let tableRows = program.map(row => {
-        // Cerca pattern "HH:MM - descrizione"
-        const match = row.match(/^(\d{2}:\d{2})\s*-\s*(.+)$/);
-        let time = '', activity = '';
-        if (match) {
-            time = match[1];
-            activity = match[2];
-        } else {
-            time = '';
-            activity = row;
+        if (typeof row === 'object' && row.time && row.activity) {
+            // Nuovo formato JSON
+            return `<tr>
+                <td class="px-3 py-2 border-b border-white/20 text-blue-200 font-mono text-sm">${row.time}</td>
+                <td class="px-3 py-2 border-b border-white/20 text-white text-sm">${row.activity}</td>
+            </tr>`;
+        } else if (typeof row === 'string') {
+            // Vecchio formato stringa
+            const match = row.match(/^(\d{2}:\d{2})\s*-\s*(.+)$/);
+            let time = '', activity = '';
+            if (match) {
+                time = match[1];
+                activity = match[2];
+            } else {
+                time = '';
+                activity = row;
+            }
+            return `<tr>
+                <td class="px-3 py-2 border-b border-white/20 text-blue-200 font-mono text-sm">${time}</td>
+                <td class="px-3 py-2 border-b border-white/20 text-white text-sm">${activity}</td>
+            </tr>`;
         }
-        return `<tr>
-            <td class="px-3 py-2 border-b border-white/20 text-blue-200 font-mono text-sm">${time}</td>
-            <td class="px-3 py-2 border-b border-white/20 text-white text-sm">${activity}</td>
-        </tr>`;
+        return '';
     }).join('');
     programContainer.innerHTML = `
         <table class="w-full bg-white/10 rounded-lg overflow-hidden">
