@@ -9,47 +9,48 @@ let CONFIG = {
     accessCode: 'DEMO2025' // Codice protetto
 };
 
-// Carica variabili d'ambiente Netlify se disponibili
+
+// --- Caricamento programma dal file remoto (con fallback locale) ---
+async function loadProgram() {
+  try {
+    // Prova a caricare dal file remoto
+    const res = await fetch('/data/programma.json', { cache: "no-store" });
+    if (!res.ok) throw new Error('Remote fetch failed');
+    const data = await res.json();
+    // Aggiorna anche localStorage per fallback futuro
+    localStorage.setItem('programma', JSON.stringify(data));
+    return data;
+  } catch (e) {
+    // Se fallisce, usa localStorage
+    const local = localStorage.getItem('programma');
+    if (local) return JSON.parse(local);
+    // Se non c’è nulla, restituisci array vuoto
+    return [];
+  }
+}
+
+// --- Salvataggio programma su Netlify (con fallback locale) ---
+async function saveProgram(programma, adminPassword) {
+  try {
+    // Prova a salvare tramite funzione Netlify
+    const res = await fetch('/.netlify/functions/update-programma', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: adminPassword, programma })
+    });
+    if (!res.ok) throw new Error('Remote save failed');
+    // Aggiorna anche localStorage
+    localStorage.setItem('programma', JSON.stringify(programma));
+    return true;
+  } catch (e) {
+    // Se fallisce, salva solo in localStorage
+    localStorage.setItem('programma', JSON.stringify(programma));
+    return false;
+  }
+}
+
+// Carica variabili d'ambiente Netlify se disponibili (solo se presenti)
 if (typeof process !== 'undefined' && process.env) {
-    
-    // --- Caricamento programma dal file remoto (con fallback locale) ---
-    async function loadProgram() {
-      try {
-        // Prova a caricare dal file remoto
-        const res = await fetch('/data/programma.json', { cache: "no-store" });
-        if (!res.ok) throw new Error('Remote fetch failed');
-        const data = await res.json();
-        // Aggiorna anche localStorage per fallback futuro
-        localStorage.setItem('programma', JSON.stringify(data));
-        return data;
-      } catch (e) {
-        // Se fallisce, usa localStorage
-        const local = localStorage.getItem('programma');
-        if (local) return JSON.parse(local);
-        // Se non c’è nulla, restituisci array vuoto
-        return [];
-      }
-    }
-    
-    // --- Salvataggio programma su Netlify (con fallback locale) ---
-    async function saveProgram(programma, adminPassword) {
-      try {
-        // Prova a salvare tramite funzione Netlify
-        const res = await fetch('/.netlify/functions/update-programma', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ password: adminPassword, programma })
-        });
-        if (!res.ok) throw new Error('Remote save failed');
-        // Aggiorna anche localStorage
-        localStorage.setItem('programma', JSON.stringify(programma));
-        return true;
-      } catch (e) {
-        // Se fallisce, salva solo in localStorage
-        localStorage.setItem('programma', JSON.stringify(programma));
-        return false;
-      }
-    }
     CONFIG.adminPassword = process.env.VITE_ADMIN_PASSWORD || CONFIG.adminPassword;
     CONFIG.accessCode = process.env.VITE_ACCESS_CODE || CONFIG.accessCode;
     CONFIG.apiKey = process.env.VITE_API_KEY || CONFIG.apiKey;
