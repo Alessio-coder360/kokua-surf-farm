@@ -10,7 +10,7 @@ exports.handler = async (event) => {
     const { password, programma } = JSON.parse(event.body);
 
     // Proteggi con la stessa password admin (imposta su Netlify come variabile ambiente)
-    if (password !== process.env.ADMIN_PASSWORD) {
+    if (password !== process.env.VITE_ADMIN_PASSWORD) {
       return { statusCode: 401, body: 'Unauthorized' };
     }
 
