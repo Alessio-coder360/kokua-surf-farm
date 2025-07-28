@@ -137,6 +137,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     checkAccessLimits();
     initializeApp();
+
+    // Precompila campo password admin SOLO in locale se PRIVATE_CONFIG presente
+    if ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && typeof PRIVATE_CONFIG !== 'undefined' && PRIVATE_CONFIG && PRIVATE_CONFIG.adminPassword) {
+        const adminPasswordInput = document.getElementById('admin-password');
+        if (adminPasswordInput) {
+            adminPasswordInput.value = PRIVATE_CONFIG.adminPassword;
+        }
+    }
     
     // --- Admin panel navigation (solo Programma e Quiz) ---
     function showAdminSection(section) {
@@ -822,11 +830,14 @@ function saveSettings() {
     if (!appState.isAdminLoggedIn) return;
 
 
+    // Usa sempre la password inserita dall’utente admin
+    const adminPasswordInput = document.getElementById('admin-password');
+    const passwordToUse = adminPasswordInput ? adminPasswordInput.value : CONFIG.adminPassword;
     // Salva il programma sia su remoto (Netlify Function) che in localStorage (fallback)
     if (Array.isArray(appState.tempProgram)) {
         const cleanProgram = appState.tempProgram.filter(line => line && line.trim());
         // Prova a salvare su remoto, fallback automatico su localStorage
-        saveProgram(cleanProgram, CONFIG.adminPassword).then(success => {
+        saveProgram(cleanProgram, passwordToUse).then(success => {
             if (success) {
                 console.log('[DEBUG] Programma salvato su remoto:', cleanProgram);
             } else {
