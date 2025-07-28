@@ -160,3 +160,11 @@ QR Code per condivisione rapida
 Analytics visite (Google Analytics)
 Newsletter signup
 Recensioni clienti
+
+
+
+
+
+// Spiegazione: opts.every(o=>o) controlla che ogni opzione sia "truthy" (non vuota, non null, non undefined),
+// ma se una opzione è una stringa vuota (""), il risultato è false e il quiz non viene salvato.
+// opts[0] && opts[1] && opts[2] è equivalente a un AND logico tra le tre opzioni, più chiaro e diretto.

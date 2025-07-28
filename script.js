@@ -1,7 +1,7 @@
 // Configurazione pubblica (sicura per GitHub)
 let CONFIG = {
     adminPassword: 'demo123', // Fallback per demo - sovrascritto da variabili ambiente
-    instagramUrl: 'https://instagram.com/tuosurfcamp',
+    instagramUrl: 'https://www.instagram.com/kokuasurfarm?igsh=MXhybHYzNmZjcnhveQ%3D%3D&utm_source=qr',
     sheetId: '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms', // Google Sheets ID (pubblico)
     apiKey: '', // API key protetta
     // Protezione accessi
@@ -11,6 +11,45 @@ let CONFIG = {
 
 // Carica variabili d'ambiente Netlify se disponibili
 if (typeof process !== 'undefined' && process.env) {
+    
+    // --- Caricamento programma dal file remoto (con fallback locale) ---
+    async function loadProgram() {
+      try {
+        // Prova a caricare dal file remoto
+        const res = await fetch('/data/programma.json', { cache: "no-store" });
+        if (!res.ok) throw new Error('Remote fetch failed');
+        const data = await res.json();
+        // Aggiorna anche localStorage per fallback futuro
+        localStorage.setItem('programma', JSON.stringify(data));
+        return data;
+      } catch (e) {
+        // Se fallisce, usa localStorage
+        const local = localStorage.getItem('programma');
+        if (local) return JSON.parse(local);
+        // Se non c’è nulla, restituisci array vuoto
+        return [];
+      }
+    }
+    
+    // --- Salvataggio programma su Netlify (con fallback locale) ---
+    async function saveProgram(programma, adminPassword) {
+      try {
+        // Prova a salvare tramite funzione Netlify
+        const res = await fetch('/.netlify/functions/update-programma', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: adminPassword, programma })
+        });
+        if (!res.ok) throw new Error('Remote save failed');
+        // Aggiorna anche localStorage
+        localStorage.setItem('programma', JSON.stringify(programma));
+        return true;
+      } catch (e) {
+        // Se fallisce, salva solo in localStorage
+        localStorage.setItem('programma', JSON.stringify(programma));
+        return false;
+      }
+    }
     CONFIG.adminPassword = process.env.VITE_ADMIN_PASSWORD || CONFIG.adminPassword;
     CONFIG.accessCode = process.env.VITE_ACCESS_CODE || CONFIG.accessCode;
     CONFIG.apiKey = process.env.VITE_API_KEY || CONFIG.apiKey;
@@ -31,8 +70,12 @@ function updateConfigFromPrivate() {
 // Stato dell'applicazione
 let appState = {
     isAdminLoggedIn: false,
-    currentQuiz: null,
-    selectedRating: null
+    quizList: [], // array di domande
+    quizIndex: 0, // domanda attuale
+    quizAnswers: [], // risposte utente
+    quizSubmitted: false,
+    selectedRating: null,
+    tempProgram: null // Programma temporaneo per editing admin
 };
 
 // Dati di default
@@ -46,15 +89,44 @@ const defaultData = {
         '16:30 - 📸 Revisione video e foto',
         '17:30 - 🏆 Feedback e premiazioni'
     ],
-    quiz: {
-        question: 'Qual è la condizione ideale del vento per il surf?',
-        options: [
-            'Vento offshore (da terra verso mare)',
-            'Vento onshore (da mare verso terra)', 
-            'Vento laterale'
-        ],
-        correct: 'A'
-    }
+    quiz: [
+        {
+            question: 'Qual è la condizione ideale del vento per il surf?',
+            options: [
+                'Vento offshore (da terra verso mare)',
+                'Vento onshore (da mare verso terra)',
+                'Vento laterale'
+            ],
+            correct: 'A'
+        },
+        {
+            question: 'Qual è la tavola più adatta per un principiante?',
+            options: [
+                'Shortboard',
+                'Longboard',
+                'Gun'
+            ],
+            correct: 'B'
+        },
+        {
+            question: 'Cosa significa "duck dive"?',
+            options: [
+                'Tuffarsi sotto l’onda con la tavola',
+                'Saltare sull’onda',
+                'Girare la tavola in aria'
+            ],
+            correct: 'A'
+        },
+        {
+            question: 'Qual è il segnale universale per chiedere aiuto in acqua?',
+            options: [
+                'Alzare un braccio',
+                'Fischiare',
+                'Battere la tavola sull’acqua'
+            ],
+            correct: 'A'
+        }
+    ]
 };
 
 // Inizializzazione app
@@ -64,6 +136,35 @@ document.addEventListener('DOMContentLoaded', function() {
     
     checkAccessLimits();
     initializeApp();
+    
+    // --- Admin panel navigation (solo Programma e Quiz) ---
+    function showAdminSection(section) {
+        document.querySelectorAll('.admin-section').forEach(s => s.classList.add('hidden'));
+        document.getElementById('admin-section-' + section).classList.remove('hidden');
+        document.querySelectorAll('.admin-tab').forEach(tab => tab.classList.remove('bg-blue-100', 'text-blue-700'));
+        document.getElementById('admin-tab-' + section).classList.add('bg-blue-100', 'text-blue-700');
+    }
+    // Tabs (solo program e quiz)
+    const tabIds = ['program', 'quiz'];
+    tabIds.forEach(tab => {
+        const btn = document.getElementById('admin-tab-' + tab);
+        if (btn) btn.onclick = () => showAdminSection(tab);
+    });
+    // Frecce/carousel (solo tra program e quiz)
+    const navMap = [
+        {from: 'program', to: 'quiz', btn: 'to-quiz'},
+        {from: 'quiz', to: 'program', btn: 'to-program'}
+    ];
+    navMap.forEach(nav => {
+        const btn = document.getElementById(nav.btn);
+        if (btn) btn.onclick = () => showAdminSection(nav.to);
+    });
+    // Default: mostra Programma
+    if (document.getElementById('admin-section-program')) showAdminSection('program');
+
+    // Semplifica pulsanti chiudi: lascia solo close-admin
+    const closeAlt = document.getElementById('close-admin-alt');
+    if (closeAlt) closeAlt.style.display = 'none';
 });
 
 // Controllo accessi intelligente
@@ -97,102 +198,310 @@ function initializeApp() {
 }
 
 function setupEventListeners() {
+    // Chiudi pannello admin (Annulla modifiche)
+    const closeAdminBtn = document.getElementById('close-admin');
+    if (closeAdminBtn) closeAdminBtn.addEventListener('click', closeAdminPanel);
+    const adminLoginBtn = document.getElementById('admin-login');
+    if (adminLoginBtn) adminLoginBtn.addEventListener('click', handleAdminLogin);
     // Admin toggle
-    document.getElementById('admin-toggle').addEventListener('click', toggleAdminPanel);
-    document.getElementById('close-admin').addEventListener('click', closeAdminPanel);
-    document.getElementById('close-admin-alt').addEventListener('click', closeAdminPanel);
-    document.getElementById('admin-login').addEventListener('click', handleAdminLogin);
-    document.getElementById('save-settings').addEventListener('click', saveSettings);
+    const adminToggle = document.getElementById('admin-toggle');
+    if (adminToggle) adminToggle.addEventListener('click', toggleAdminPanel);
 
-    // Enter key nel campo password
-    document.getElementById('admin-password').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            handleAdminLogin();
-        }
-    });
 
-    // Quiz
-    document.querySelectorAll('.quiz-option').forEach(button => {
-        button.addEventListener('click', handleQuizAnswer);
-    });
+    const closeAdminLogin = document.getElementById('close-admin-login');
+    if (closeAdminLogin) closeAdminLogin.addEventListener('click', closeAdminPanel);
 
-    // Feedback
-    document.querySelectorAll('.feedback-btn').forEach(button => {
-        button.addEventListener('click', handleFeedbackRating);
-    });
-    document.getElementById('submit-feedback').addEventListener('click', submitFeedback);
+    const submitFeedbackBtn = document.getElementById('submit-feedback');
+    if (submitFeedbackBtn) submitFeedbackBtn.addEventListener('click', submitFeedback);
 
     // WhatsApp share
-    document.getElementById('share-whatsapp').addEventListener('click', shareOnWhatsApp);
+    const shareWhatsappBtn = document.getElementById('share-whatsapp');
+    if (shareWhatsappBtn) shareWhatsappBtn.addEventListener('click', shareOnWhatsApp);
 }
 
 // Gestione programma
 function loadProgram() {
     const programContainer = document.getElementById('daily-program');
-    const savedProgram = localStorage.getItem('surfcamp-program');
-    const program = savedProgram ? JSON.parse(savedProgram) : defaultData.program;
+    let program = [];
+    try {
+        const savedProgram = localStorage.getItem('surfcamp-program');
+        if (savedProgram) {
+            program = JSON.parse(savedProgram);
+            // Se array vuoto o contiene solo placeholder, resetta
+            const onlyEmpty = Array.isArray(program) && program.every(row => !row.trim() || row.trim() === '-' || row.trim() === ' - ');
+            if (!Array.isArray(program) || !program.length || onlyEmpty) {
+                program = [...defaultData.program];
+                localStorage.setItem('surfcamp-program', JSON.stringify(program));
+                // Ricarica la pagina per forzare la UI
+                setTimeout(() => window.location.reload(), 100);
+                return;
+            }
+        } else {
+            program = [...defaultData.program];
+            localStorage.setItem('surfcamp-program', JSON.stringify(program));
+            setTimeout(() => window.location.reload(), 100);
+            return;
+        }
+    } catch {
+        program = [...defaultData.program];
+        localStorage.setItem('surfcamp-program', JSON.stringify(program));
+        setTimeout(() => window.location.reload(), 100);
+        return;
+    }
 
-    programContainer.innerHTML = program.map(activity => `
-        <div class="bg-white/20 rounded-lg p-4 text-white flex items-center">
-            <div class="mr-4 text-2xl">⏰</div>
-            <div class="flex-1">${activity}</div>
-        </div>
-    `).join('');
+    // Crea tabella matrice: colonna sinistra Time, destra Activity
+    let tableRows = program.map(row => {
+        // Cerca pattern "HH:MM - descrizione"
+        const match = row.match(/^(\d{2}:\d{2})\s*-\s*(.+)$/);
+        let time = '', activity = '';
+        if (match) {
+            time = match[1];
+            activity = match[2];
+        } else {
+            time = '';
+            activity = row;
+        }
+        return `<tr>
+            <td class="px-3 py-2 border-b border-white/20 text-blue-200 font-mono text-sm">${time}</td>
+            <td class="px-3 py-2 border-b border-white/20 text-white text-sm">${activity}</td>
+        </tr>`;
+    }).join('');
+    programContainer.innerHTML = `
+        <table class="w-full bg-white/10 rounded-lg overflow-hidden">
+            <thead>
+                <tr>
+                    <th class="px-3 py-2 text-left text-blue-400 text-xs font-bold border-b border-white/30">Time</th>
+                    <th class="px-3 py-2 text-left text-blue-400 text-xs font-bold border-b border-white/30">Activity</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${tableRows}
+            </tbody>
+        </table>
+    `;
 }
 
 // Gestione quiz
 function loadQuiz() {
+    // Carica quiz multiplo
     const savedQuiz = localStorage.getItem('surfcamp-quiz');
-    const quiz = savedQuiz ? JSON.parse(savedQuiz) : defaultData.quiz;
-    appState.currentQuiz = quiz;
-
-    document.getElementById('quiz-question').textContent = quiz.question;
-    
-    const optionsContainer = document.getElementById('quiz-options');
-    optionsContainer.innerHTML = quiz.options.map((option, index) => `
-        <button class="quiz-option w-full text-left p-3 bg-white/10 hover:bg-white/20 rounded-lg text-white transition-colors" data-answer="${String.fromCharCode(65 + index)}">
-            ${String.fromCharCode(65 + index)}) ${option}
-        </button>
-    `).join('');
-
-    // Riassegna event listeners
-    document.querySelectorAll('.quiz-option').forEach(button => {
-        button.addEventListener('click', handleQuizAnswer);
-    });
+    let quizList = [];
+    if (savedQuiz) {
+        try {
+            const parsed = JSON.parse(savedQuiz);
+            quizList = Array.isArray(parsed) ? parsed : [parsed];
+        } catch {
+            quizList = defaultData.quiz;
+        }
+    } else {
+        quizList = defaultData.quiz;
+    }
+    appState.quizList = quizList;
+    appState.quizIndex = 0;
+    appState.quizAnswers = new Array(quizList.length).fill(null);
+    appState.quizSubmitted = false;
+    renderQuiz();
 }
 
-function handleQuizAnswer(e) {
-    const selectedAnswer = e.target.dataset.answer;
-    const correct = appState.currentQuiz.correct;
-    
-    // Reset tutti i bottoni
-    document.querySelectorAll('.quiz-option').forEach(btn => {
-        btn.classList.remove('bg-green-500', 'bg-red-500');
-        btn.classList.add('bg-white/10');
-    });
+// Rendering quiz carosello
+function renderQuiz() {
+    const quizSection = document.getElementById('quiz-section');
+    const idx = appState.quizIndex;
+    const quiz = appState.quizList[idx];
+    const total = appState.quizList.length;
+    const answered = appState.quizAnswers[idx];
+    const submitted = appState.quizSubmitted;
 
-    // Colora la risposta selezionata
-    if (selectedAnswer === correct) {
-        e.target.classList.remove('bg-white/10');
-        e.target.classList.add('bg-green-500');
-        showNotification('🎉 Corretto! Ottima risposta!', 'success');
-    } else {
-        e.target.classList.remove('bg-white/10');
-        e.target.classList.add('bg-red-500');
-        // Mostra anche quella corretta
-        document.querySelector(`[data-answer="${correct}"]`).classList.add('bg-green-500');
-        showNotification('❌ Sbagliato! La risposta corretta è evidenziata in verde.', 'error');
+    // Se quiz finito, mostra risultato e animazione onda
+    if (submitted) {
+        let score = 0;
+        appState.quizAnswers.forEach((ans, i) => {
+            if (ans === appState.quizList[i].correct) score++;
+        });
+        quizSection.innerHTML = `
+        <div class="bg-white/20 rounded-lg p-4 mb-4 flex flex-col items-center relative overflow-hidden">
+            <div class="relative w-full flex flex-col items-center mb-4" style="height:120px;">
+                <!-- Onde animate -->
+                <div class="absolute left-0 bottom-0 w-full h-24 pointer-events-none overflow-hidden">
+                    <div class="wave wave1"></div>
+                    <div class="wave wave2"></div>
+                    <div class="wave wave3"></div>
+                </div>
+                <!-- Surfista -->
+                <div class="absolute left-1/2 bottom-16 -translate-x-1/2 z-10 surfer-anim">
+                    <span style="font-size:2.5rem; filter: drop-shadow(0 2px 6px #0003);">🏄‍♂️</span>
+                </div>
+            </div>
+            <div class="text-2xl font-bold text-blue-700 mb-2 animate-fade-in">Risultato Quiz</div>
+            <div class="text-lg text-gray-100 mb-2 animate-fade-in">Hai risposto correttamente a <span class="font-bold">${score} / ${total}</span> domande!</div>
+            <div class="text-lg text-blue-400 mb-4 animate-fade-in">🌊🤙 Aloha spirit!</div>
+            <button id="quiz-retry" class="mt-2 bg-blue-500 hover:bg-blue-600 text-white px-5 py-2 rounded-full font-bold animate-fade-in">Riprova</button>
+        </div>
+        <style>
+        /* Onde animate parallax */
+        .wave {
+            position: absolute;
+            left: 0; bottom: 0;
+            width: 200%; height: 60px;
+            background-repeat: repeat-x;
+            background-size: 50% 60px;
+            opacity: 0.7;
+        }
+        .wave1 {
+            background-image: url('data:image/svg+xml;utf8,<svg width="400" height="60" viewBox="0 0 400 60" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 40 Q 50 20 100 40 T 200 40 T 300 40 T 400 40 V60 H0Z" fill="%233b82f6"/></svg>');
+            animation: wave-move1 7s linear infinite;
+            z-index: 1;
+        }
+        .wave2 {
+            background-image: url('data:image/svg+xml;utf8,<svg width="400" height="60" viewBox="0 0 400 60" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 35 Q 50 55 100 35 T 200 35 T 300 35 T 400 35 V60 H0Z" fill="%233b82f6" fill-opacity="0.7"/></svg>');
+            animation: wave-move2 10s linear infinite;
+            z-index: 2;
+        }
+        .wave3 {
+            background-image: url('data:image/svg+xml;utf8,<svg width="400" height="60" viewBox="0 0 400 60" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 50 Q 50 30 100 50 T 200 50 T 300 50 T 400 50 V60 H0Z" fill="%233b82f6" fill-opacity="0.4"/></svg>');
+            animation: wave-move3 13s linear infinite;
+            z-index: 3;
+        }
+        @keyframes wave-move1 { 0%{transform:translateX(0);} 100%{transform:translateX(-50%);} }
+        @keyframes wave-move2 { 0%{transform:translateX(0);} 100%{transform:translateX(-40%);} }
+        @keyframes wave-move3 { 0%{transform:translateX(0);} 100%{transform:translateX(-30%);} }
+        /* Surfista galleggiante */
+        .surfer-anim { animation: surfer-bounce 2.5s ease-in-out infinite; }
+        @keyframes surfer-bounce { 0%,100%{transform:translate(-50%,0);} 50%{transform:translate(-50%,-18px);} }
+        /* Fade-in testo */
+        @keyframes fade-in { from{opacity:0;transform:translateY(20px);} to{opacity:1;transform:translateY(0);} }
+        .animate-fade-in { animation: fade-in 1s ease; }
+        </style>
+        `;
+        document.getElementById('quiz-retry').onclick = () => {
+            appState.quizIndex = 0;
+            appState.quizAnswers = new Array(total).fill(null);
+            appState.quizSubmitted = false;
+            renderQuiz();
+        };
+        return;
     }
 
-    // Mantieni attivi i bottoni per permettere di cambiare risposta
-    // Solo evidenzia visualmente la risposta per 2 secondi
-    setTimeout(() => {
-        document.querySelectorAll('.quiz-option').forEach(btn => {
-            btn.classList.remove('bg-green-500', 'bg-red-500');
-            btn.classList.add('bg-white/10');
-        });
-    }, 2000);
+    // Domanda attuale
+    quizSection.innerHTML = `
+        <div class="bg-white/20 rounded-lg p-4 mb-4">
+            <p class="text-white text-lg mb-4" id="quiz-question">${quiz.question}</p>
+            <div class="space-y-2" id="quiz-options">
+                ${quiz.options.map((option, i) => {
+                    const letter = String.fromCharCode(65 + i);
+                    let btnClass = 'quiz-option w-full text-left p-3 bg-white/10 hover:bg-white/20 rounded-lg text-white transition-colors';
+                    if (answered === letter) {
+                        btnClass += ' bg-green-500'; // Sempre verde se selezionata
+                    }
+                    return `<button class="${btnClass}" data-answer="${letter}">${letter}) ${option}</button>`;
+                }).join('')}
+            </div>
+            <div class="flex justify-end mt-6">
+                <button id="quiz-next" class="${!answered ? 'opacity-30 pointer-events-none' : ''} bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-bold">${idx === total - 1 ? 'Invia' : 'Avanti'}</button>
+            </div>
+        </div>
+    `;
+    // Event listeners risposte
+    document.querySelectorAll('.quiz-option').forEach(btn => {
+        btn.onclick = (e) => {
+            appState.quizAnswers[idx] = e.target.dataset.answer;
+            renderQuiz();
+        };
+    });
+    document.getElementById('quiz-next').onclick = () => {
+        if (!appState.quizAnswers[idx]) return;
+        if (idx < total - 1) {
+            appState.quizIndex++;
+            renderQuiz();
+        } else {
+            appState.quizSubmitted = true;
+            // Feedback finale con riepilogo
+            let score = 0;
+            appState.quizAnswers.forEach((ans, i) => {
+                if (ans === appState.quizList[i].correct) score++;
+            });
+            let summary = '<div class="mt-4 text-left w-full max-w-lg mx-auto">';
+            summary += '<h4 class="text-lg font-bold text-blue-400 mb-2">Riepilogo risposte:</h4>';
+            appState.quizList.forEach((q, i) => {
+                const userAns = appState.quizAnswers[i];
+                const isCorrect = userAns === q.correct;
+                // Trova il testo della risposta data e di quella corretta
+                const userText = userAns ? q.options["ABC".indexOf(userAns)] : '-';
+                const correctText = q.options["ABC".indexOf(q.correct)];
+                summary += `<div class="mb-2 p-2 rounded-lg ${isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
+                    <span class="font-bold">${i+1}.</span> ${q.question}<br>
+                    <span>Risposta data: <b>${userText}</b></span><br>
+                    <span>Corretta: <b>${correctText}</b></span>
+                </div>`;
+            });
+            summary += '</div>';
+            quizSection.innerHTML = `
+            <div class="bg-white/20 rounded-lg p-4 mb-4 flex flex-col items-center relative overflow-hidden">
+                <div class="relative w-full flex flex-col items-center mb-4" style="height:120px;">
+                    <!-- Onde animate -->
+                    <div class="absolute left-0 bottom-0 w-full h-24 pointer-events-none overflow-hidden">
+                        <div class="wave wave1"></div>
+                        <div class="wave wave2"></div>
+                        <div class="wave wave3"></div>
+                    </div>
+                    <!-- Surfista -->
+                    <div class="absolute left-1/2 bottom-16 -translate-x-1/2 z-10 surfer-anim">
+                        <span style="font-size:2.5rem; filter: drop-shadow(0 2px 6px #0003);">🏄‍♂️</span>
+                    </div>
+                </div>
+                <div class="text-2xl font-bold text-blue-700 mb-2 animate-fade-in">Risultato Quiz</div>
+                <div class="text-lg text-gray-100 mb-2 animate-fade-in">Hai risposto correttamente a <span class="font-bold">${score} / ${appState.quizList.length}</span> domande!</div>
+                <div class="text-lg text-blue-400 mb-4 animate-fade-in">🌊🤙 Aloha spirit!</div>
+                ${summary}
+                <button id="quiz-retry" class="mt-2 bg-blue-500 hover:bg-blue-600 text-white px-5 py-2 rounded-full font-bold animate-fade-in">Riprova</button>
+            </div>
+            <style>
+            /* Onde animate parallax */
+            .wave {
+                position: absolute;
+                left: 0; bottom: 0;
+                width: 200%; height: 60px;
+                background-repeat: repeat-x;
+                background-size: 50% 60px;
+                opacity: 0.7;
+            }
+            .wave1 {
+                background-image: url('data:image/svg+xml;utf8,<svg width="400" height="60" viewBox="0 0 400 60" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 40 Q 50 20 100 40 T 200 40 T 300 40 T 400 40 V60 H0Z" fill="%233b82f6"/></svg>');
+                animation: wave-move1 7s linear infinite;
+                z-index: 1;
+            }
+            .wave2 {
+                background-image: url('data:image/svg+xml;utf8,<svg width="400" height="60" viewBox="0 0 400 60" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 35 Q 50 55 100 35 T 200 35 T 300 35 T 400 35 V60 H0Z" fill="%233b82f6" fill-opacity="0.7"/></svg>');
+                animation: wave-move2 10s linear infinite;
+                z-index: 2;
+            }
+            .wave3 {
+                background-image: url('data:image/svg+xml;utf8,<svg width="400" height="60" viewBox="0 0 400 60" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 50 Q 50 30 100 50 T 200 50 T 300 50 T 400 50 V60 H0Z" fill="%233b82f6" fill-opacity="0.4"/></svg>');
+                animation: wave-move3 13s linear infinite;
+                z-index: 3;
+            }
+            @keyframes wave-move1 { 0%{transform:translateX(0);} 100%{transform:translateX(-50%);} }
+            @keyframes wave-move2 { 0%{transform:translateX(0);} 100%{transform:translateX(-40%);} }
+            @keyframes wave-move3 { 0%{transform:translateX(0);} 100%{transform:translateX(-30%);} }
+            /* Surfista galleggiante */
+            .surfer-anim { animation: surfer-bounce 2.5s ease-in-out infinite; }
+            @keyframes surfer-bounce { 0%,100%{transform:translate(-50%,0);} 50%{transform:translate(-50%,-18px);} }
+            /* Fade-in testo */
+            @keyframes fade-in { from{opacity:0;transform:translateY(20px);} to{opacity:1;transform:translateY(0);} }
+            .animate-fade-in { animation: fade-in 1s ease; }
+            </style>
+            `;
+            document.getElementById('quiz-retry').onclick = () => {
+                appState.quizIndex = 0;
+                appState.quizAnswers = new Array(appState.quizList.length).fill(null);
+                appState.quizSubmitted = false;
+                renderQuiz();
+            };
+        }
+    };
 }
+//
+// handleQuizAnswer non serve più, gestito da renderQuiz
 
 // Gestione feedback
 function handleFeedbackRating(e) {
@@ -291,8 +600,33 @@ function closeAdminPanel() {
 }
 
 // Login admin tramite funzione serverless
+// MODIFICA: La funzione handleAdminLogin ora gestisce login locale (confronto diretto password) e login Netlify (fetch serverless).
+// Se hai problemi su Netlify, puoi ripristinare la versione precedente eliminando il blocco 'isLocal' e lasciando solo la fetch.
+// (Vedi storico conversazione Copilot per il codice originale)
 function handleAdminLogin() {
     const password = document.getElementById('admin-password').value;
+    // Se siamo in locale (no Netlify Functions), confronto diretto
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (isLocal) {
+        let valid = false;
+        if (typeof PRIVATE_CONFIG !== 'undefined' && PRIVATE_CONFIG.adminPassword) {
+            valid = password === PRIVATE_CONFIG.adminPassword;
+        } else if (typeof CONFIG !== 'undefined' && CONFIG.adminPassword) {
+            valid = password === CONFIG.adminPassword;
+        }
+        if (valid) {
+            appState.isAdminLoggedIn = true;
+            document.getElementById('admin-login-section').classList.add('hidden');
+            document.getElementById('admin-content').classList.remove('hidden');
+            loadAdminData();
+            showNotification('✅ Accesso admin effettuato!', 'success');
+        } else {
+            showNotification('❌ Password errata!', 'error');
+            document.getElementById('admin-password').value = '';
+        }
+        return;
+    }
+    // In produzione: fetch serverless
     fetch('/.netlify/functions/check-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -317,55 +651,233 @@ function handleAdminLogin() {
 }
 
 function loadAdminData() {
-    // Carica programma corrente
-    const savedProgram = localStorage.getItem('surfcamp-program');
-    const program = savedProgram ? JSON.parse(savedProgram) : defaultData.program;
-    document.getElementById('program-editor').value = program.join('\n');
+    // Collega il bottone Salva dopo aver generato la UI admin
+    const saveBtn = document.getElementById('save-settings');
+    if (saveBtn) saveBtn.onclick = saveSettings;
+    // Carica programma corrente SOLO la prima volta o se tempProgram è nullo
+    if (!appState.tempProgram) {
+        const savedProgram = localStorage.getItem('surfcamp-program');
+        appState.tempProgram = savedProgram ? JSON.parse(savedProgram) : [...defaultData.program];
+    }
+    const program = appState.tempProgram;
+    // Editor tabellare per time/activity
+    const programEditor = document.getElementById('program-editor');
+    if (programEditor) programEditor.style.display = 'none';
+    const programTableEditor = document.getElementById('program-table-editor');
+    if (programTableEditor) {
+        // Se il programma è vuoto, mostra comunque la tabella con una riga vuota
+        const safeProgram = Array.isArray(program) && program.length ? program : [' - '];
+        // Genera la tabella
+        let tableHtml = `<table class="w-full bg-white/10 rounded-lg overflow-hidden mb-2">
+            <thead>
+                <tr>
+                    <th class="px-2 py-2 text-left text-blue-400 text-xs font-bold border-b border-white/30">Time</th>
+                    <th class="px-2 py-2 text-left text-blue-400 text-xs font-bold border-b border-white/30">Activity</th>
+                    <th class="px-2 py-2 text-xs font-bold border-b border-white/30"></th>
+                </tr>
+            </thead>
+            <tbody>`;
+        safeProgram.forEach((row, idx) => {
+            const match = row.match(/^([0-9]{2}:[0-9]{2})\s*-\s*(.+)$/);
+            let time = '', activity = '';
+            if (match) {
+                time = match[1];
+                activity = match[2];
+            } else {
+                time = '';
+                activity = row;
+            }
+            tableHtml += `<tr>
+                <td><input type="text" class="program-time-input w-full p-1 rounded text-xs" value="${time}" data-idx="${idx}"></td>
+                <td><input type="text" class="program-activity-input w-full p-1 rounded text-xs" value="${activity}" data-idx="${idx}"></td>
+                <td><button type="button" class="remove-program-row text-red-500 text-lg font-bold" data-idx="${idx}" title="Elimina">&times;</button></td>
+            </tr>`;
+        });
+        tableHtml += `</tbody></table>
+            <div class="flex gap-2 mb-2">
+                <button id="add-program-row" class="bg-blue-500 text-white px-3 py-1 rounded text-xs font-bold">+ Aggiungi cella</button>
+            </div>`;
+        programTableEditor.innerHTML = tableHtml;
+        // Binding eventi: elimina, aggiungi, modifica
+        // Elimina riga
+        const removeBtns = programTableEditor.querySelectorAll('.remove-program-row');
+        removeBtns.forEach((btn, i) => {
+            if (!btn) return;
+            btn.onclick = (e) => {
+                const idx = parseInt(e.target.dataset.idx);
+                appState.tempProgram.splice(idx, 1);
+                loadAdminData();
+            };
+        });
+        // Aggiungi riga
+        const addBtn = programTableEditor.querySelector('#add-program-row');
+        if (addBtn) {
+            addBtn.onclick = () => {
+                appState.tempProgram.push(' - ');
+                loadAdminData();
+            };
+        }
+        // Modifica input
+        const timeInputs = programTableEditor.querySelectorAll('.program-time-input');
+        const activityInputs = programTableEditor.querySelectorAll('.program-activity-input');
+        timeInputs.forEach((input, i) => {
+            if (!input) return;
+            input.addEventListener('input', () => {
+                const idx = parseInt(input.dataset.idx);
+                const time = input.value.trim();
+                const activity = activityInputs[idx] ? activityInputs[idx].value.trim() : '';
+                appState.tempProgram[idx] = time ? `${time} - ${activity}` : activity;
+            });
+        });
+        activityInputs.forEach((input, i) => {
+            if (!input) return;
+            input.addEventListener('input', () => {
+                const idx = parseInt(input.dataset.idx);
+                const activity = input.value.trim();
+                const time = timeInputs[idx] ? timeInputs[idx].value.trim() : '';
+                appState.tempProgram[idx] = time ? `${time} - ${activity}` : activity;
+            });
+        });
+    }
 
-    // Carica quiz corrente
+    // Carica quiz multiplo e genera UI dinamica
     const savedQuiz = localStorage.getItem('surfcamp-quiz');
-    const quiz = savedQuiz ? JSON.parse(savedQuiz) : defaultData.quiz;
-    document.getElementById('quiz-question-editor').value = quiz.question;
-    document.getElementById('quiz-answer1').value = quiz.options[0] || '';
-    document.getElementById('quiz-answer2').value = quiz.options[1] || '';
-    document.getElementById('quiz-answer3').value = quiz.options[2] || '';
-    document.getElementById('quiz-correct').value = quiz.correct;
+    let quizList = [];
+    try {
+        const parsed = savedQuiz ? JSON.parse(savedQuiz) : defaultData.quiz;
+        quizList = Array.isArray(parsed) ? parsed : [parsed];
+    } catch {
+        quizList = defaultData.quiz;
+    }
+    // Nascondi vecchi campi singoli SOLO se esistono
+    const qEditor = document.getElementById('quiz-question-editor');
+    if (qEditor) qEditor.style.display = 'none';
+    const a1 = document.getElementById('quiz-answer1');
+    if (a1) a1.style.display = 'none';
+    const a2 = document.getElementById('quiz-answer2');
+    if (a2) a2.style.display = 'none';
+    const a3 = document.getElementById('quiz-answer3');
+    if (a3) a3.style.display = 'none';
+    const c = document.getElementById('quiz-correct');
+    if (c) c.style.display = 'none';
+    // Mostra editor multiplo SOLO se esiste
+    const quizEditor = document.getElementById('quiz-multi-editor');
+    if (quizEditor) {
+        quizEditor.style.display = 'block';
+        quizEditor.style.maxHeight = '350px';
+        quizEditor.style.overflowY = 'auto';
+        quizEditor.innerHTML = quizList.map((q, idx) => `
+            <div class="quiz-block bg-white/10 rounded-lg p-3 mb-2 relative group flex flex-col gap-2">
+                <div class="absolute top-2 right-2 flex gap-2 opacity-70 group-hover:opacity-100 transition">
+                    <button type="button" class="remove-quiz-btn text-red-500 hover:text-red-700 text-xl font-bold" data-idx="${idx}" title="Elimina domanda">&times;</button>
+                </div>
+                <label class="block text-xs text-white font-semibold mb-1">Domanda ${idx+1}</label>
+                <input type="text" class="quiz-q-input w-full p-2 rounded-lg text-xs mb-1 border border-white/30 bg-white/20" value="${q.question.replace(/"/g,'&quot;')}">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-1">
+                    <input type="text" class="quiz-opt-input p-2 rounded-lg text-xs border border-white/30 bg-white/20" value="${q.options[0]||''}" placeholder="Risposta A">
+                    <input type="text" class="quiz-opt-input p-2 rounded-lg text-xs border border-white/30 bg-white/20" value="${q.options[1]||''}" placeholder="Risposta B">
+                    <input type="text" class="quiz-opt-input p-2 rounded-lg text-xs border border-white/30 bg-white/20" value="${q.options[2]||''}" placeholder="Risposta C">
+                </div>
+                <label class="block text-xs text-white mb-1">Risposta corretta:</label>
+                <select class="quiz-correct-input p-2 rounded-lg text-xs border border-white/30 bg-white/20">
+                    <option value="A" ${q.correct==='A'?'selected':''}>A</option>
+                    <option value="B" ${q.correct==='B'?'selected':''}>B</option>
+                    <option value="C" ${q.correct==='C'?'selected':''}>C</option>
+                </select>
+            </div>
+        `).join('') + `
+<!-- coming soon: aggiungi domanda -->
+        `;
+        // Eventi elimina
+        const removeQuizBtns = quizEditor.querySelectorAll('.remove-quiz-btn');
+        console.log('[DEBUG] Bottoni Elimina Quiz trovati:', removeQuizBtns.length);
+        removeQuizBtns.forEach((btn, i) => {
+            if (!btn) {
+                console.warn(`[DEBUG] Bottone Elimina Quiz #${i} è null!`);
+                return;
+            }
+            btn.onclick = (e) => {
+                const idx = parseInt(e.target.dataset.idx);
+                quizList.splice(idx,1);
+                saveQuizMultiUI(quizList);
+            };
+        });
+        // Evento aggiungi
+        const addQuizBtn = quizEditor.querySelector('#add-quiz-btn');
+        if (addQuizBtn) {
+            console.log('[DEBUG] Bottone "Aggiungi domanda" quiz trovato:', addQuizBtn);
+            addQuizBtn.onclick = () => {
+                quizList.push({question:'',options:['','',''],correct:'A'});
+                saveQuizMultiUI(quizList);
+            };
+        } else {
+            console.warn('[DEBUG] Bottone "Aggiungi domanda" quiz NON trovato!');
+        }
+        // Salva lista in un campo nascosto temporaneo
+        window._quizMultiEditCache = quizList;
+        // Funzione per aggiornare la UI dopo modifica
+        function saveQuizMultiUI(newList) {
+            window._quizMultiEditCache = newList;
+            loadAdminData();
+        }
+    }
 
-    // Carica Instagram link
-    const instagramUrl = localStorage.getItem('surfcamp-instagram') || CONFIG.instagramUrl;
-    document.getElementById('instagram-link').value = instagramUrl;
+    // Sezione Instagram rimossa
 }
 
 function saveSettings() {
+    console.log('[DEBUG] saveSettings chiamato');
+    console.log('[DEBUG] closeAdminPanel chiamato');
+    const saveBtn = document.getElementById('save-settings');
+    if (saveBtn) saveBtn.addEventListener('click', saveSettings);
     if (!appState.isAdminLoggedIn) return;
 
-    // Salva programma
-    const programText = document.getElementById('program-editor').value;
-    const programArray = programText.split('\n').filter(line => line.trim());
-    localStorage.setItem('surfcamp-program', JSON.stringify(programArray));
+    // Salva SOLO ora il programma temporaneo
+    if (Array.isArray(appState.tempProgram)) {
+        const cleanProgram = appState.tempProgram.filter(line => line && line.trim());
+        localStorage.setItem('surfcamp-program', JSON.stringify(cleanProgram));
+        console.log('[DEBUG] Programma salvato:', cleanProgram);
+    }
+    // Reset tempProgram per evitare modifiche non salvate
+    appState.tempProgram = null;
 
-    // Salva quiz
-    const quizData = {
-        question: document.getElementById('quiz-question-editor').value,
-        options: [
-            document.getElementById('quiz-answer1').value,
-            document.getElementById('quiz-answer2').value,
-            document.getElementById('quiz-answer3').value
-        ],
-        correct: document.getElementById('quiz-correct').value
-    };
-    localStorage.setItem('surfcamp-quiz', JSON.stringify(quizData));
-
-    // Salva Instagram link
-    const instagramUrl = document.getElementById('instagram-link').value;
-    localStorage.setItem('surfcamp-instagram', instagramUrl);
+    // Salva quiz multiplo
+    const quizEditor = document.getElementById('quiz-multi-editor');
+    if (quizEditor && quizEditor.style.display !== 'none') {
+        const blocks = quizEditor.querySelectorAll('.quiz-block');
+        const quizList = [];
+        blocks.forEach(block => {
+            const q = block.querySelector('.quiz-q-input').value.trim();
+            const opts = Array.from(block.querySelectorAll('.quiz-opt-input')).map(i=>i.value.trim());
+            const correct = block.querySelector('.quiz-correct-input').value;
+            // Cambiamento: ora salva sempre la risposta corretta selezionata, anche se domanda e opzioni sono invariate
+            if(q && opts[0] && opts[1] && opts[2]) {
+                quizList.push({question:q,options:opts,correct});
+            }
+        });
+        localStorage.setItem('surfcamp-quiz', JSON.stringify(quizList));
+    } else {
+        // fallback: salva singola domanda (retrocompatibilità)
+        const quizData = {
+            question: document.getElementById('quiz-question-editor').value,
+            options: [
+                document.getElementById('quiz-answer1').value,
+                document.getElementById('quiz-answer2').value,
+                document.getElementById('quiz-answer3').value
+            ],
+            correct: document.getElementById('quiz-correct').value
+        };
+        localStorage.setItem('surfcamp-quiz', JSON.stringify(quizData));
+    }
 
     // Ricarica la pagina con i nuovi dati
     loadProgram();
     loadQuiz();
-    
     showNotification('💾 Impostazioni salvate con successo!', 'success');
-    closeAdminPanel();
+    setTimeout(() => {
+        closeAdminPanel();
+        console.log('[DEBUG] Pannello admin chiuso dopo salvataggio programma');
+    }, 300);
 }
 
 function loadSettings() {
