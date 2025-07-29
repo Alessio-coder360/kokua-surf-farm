@@ -16,3 +16,6 @@ package-lock.json
 
 # 🚀 File di deploy locale
 .netlify/
+
+
+netlify/functions/creds.json
