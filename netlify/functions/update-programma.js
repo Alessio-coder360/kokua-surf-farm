@@ -1,5 +1,105 @@
+
+// Libreria Google APIs
+const { google } = require('googleapis');
 const fs = require('fs');
 const path = require('path');
+
+/**
+ * Netlify Function: update-programma.js
+ *
+ * Scopo: Permette di aggiornare e leggere il programma su Google Sheets tramite API.
+ * - POST: aggiorna il programma
+ * - GET: legge il programma
+ *
+ * Come funziona:
+ * - Riceve una richiesta POST con un body JSON: { password, programma }
+ * - Riceve una richiesta GET senza body
+ * - Controlla che la password sia corretta (usando la variabile ambiente Netlify)
+ * - Se la password è giusta, aggiorna il Google Sheet
+ * - Restituisce 200 OK se tutto va bene, 401 se la password è sbagliata, 500 se c'è un errore interno
+ *
+ * Debug: usa console.log per vedere i dati in Netlify Functions logs
+ *
+ * ID Google Sheet: lo trovi nell'URL del foglio tra /d/ e /edit (es: https://docs.google.com/spreadsheets/d/ID/edit)
+ */
+
+exports.handler = async (event) => {
+  // ID del Google Sheet (inserito dall'utente)
+  const sheetId = '1IdVINEPuLVArGEiK_IW2R182RX75TO3VlO13vXlHkAU'; // <-- ID CORRETTO
+
+  // Percorso file credenziali
+  const credsPath = path.join(__dirname, 'creds.json');
+  // Carica credenziali Google
+  const creds = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
+
+  // Autenticazione Google
+  const auth = new google.auth.GoogleAuth({
+    credentials: creds,
+    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+  });
+  const sheets = google.sheets({ version: 'v4', auth: await auth.getClient() });
+
+  // --- Gestione richiesta POST (aggiorna programma) ---
+  if (event.httpMethod === 'POST') {
+    try {
+      // Estrai password e programma dal body JSON
+      const { password, programma } = JSON.parse(event.body);
+      console.log('[DEBUG] Password ricevuta:', password);
+      console.log('[DEBUG] Programma ricevuto:', programma);
+
+      // Controlla la password admin (impostata come variabile ambiente su Netlify)
+      if (password !== process.env.VITE_ADMIN_PASSWORD) {
+        console.log('[DEBUG] Password errata!');
+        return { statusCode: 401, body: 'Unauthorized' };
+      }
+
+      // Prepara i dati da scrivere (array di righe)
+      // Esempio: programma = [{time: '08:00', activity: 'Yoga'}, ...]
+      const values = programma.map(row => [row.time, row.activity]);
+      console.log('[DEBUG] Valori da scrivere su Sheets:', values);
+
+      // Scrivi su Google Sheets (sul foglio 'Programma', righe da A2 in poi)
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: 'Programma!A2:B', // Assicurati che il foglio si chiami 'Programma'
+        valueInputOption: 'RAW',
+        requestBody: { values }
+      });
+      console.log('[DEBUG] Scrittura su Google Sheets completata');
+
+      return { statusCode: 200, body: 'OK' };
+    } catch (err) {
+      console.log('[DEBUG] Errore interno:', err.message);
+      return { statusCode: 500, body: 'Errore: ' + err.message };
+    }
+  }
+
+  // --- Gestione richiesta GET (leggi programma) ---
+  if (event.httpMethod === 'GET') {
+    try {
+      // Leggi i dati dal Google Sheet
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: 'Programma!A2:B', // Assicurati che il foglio si chiami 'Programma'
+      });
+      console.log('[DEBUG] Dati letti da Sheets:', res.data.values);
+
+      // Trasforma i dati in array di oggetti
+      const programma = (res.data.values || []).map(row => ({ time: row[0], activity: row[1] }));
+      return {
+        statusCode: 200,
+        body: JSON.stringify(programma),
+        headers: { 'Content-Type': 'application/json' }
+      };
+    } catch (err) {
+      console.log('[DEBUG] Errore lettura Sheets:', err.message);
+      return { statusCode: 500, body: 'Errore: ' + err.message };
+    }
+  }
+
+  // --- Altri metodi non permessi ---
+  return { statusCode: 405, body: 'Method Not Allowed' };
+};
 
 /**
  * Netlify Function: update-programma.js
