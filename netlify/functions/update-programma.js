@@ -1,8 +1,6 @@
 
 // Libreria Google APIs
 const { google } = require('googleapis');
-const fs = require('fs');
-const path = require('path');
 
 /**
  * Netlify Function: update-programma.js
@@ -27,10 +25,22 @@ exports.handler = async (event) => {
   // ID del Google Sheet (inserito dall'utente)
   const sheetId = '1IdVINEPuLVArGEiK_IW2R182RX75TO3VlO13vXlHkAU'; // <-- ID CORRETTO
 
-  // Percorso file credenziali
-  const credsPath = path.join(__dirname, 'creds.json');
-  // Carica credenziali Google
-  const creds = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
+  // Carica credenziali Google dalle variabili ambiente (più sicuro!)
+  const creds = {
+    type: "service_account",
+    project_id: process.env.GOOGLE_PROJECT_ID,
+    private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'), // Ripristina i newline
+    client_email: process.env.GOOGLE_CLIENT_EMAIL,
+    auth_uri: "https://accounts.google.com/o/oauth2/auth",
+    token_uri: "https://oauth2.googleapis.com/token",
+    auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+    universe_domain: "googleapis.com"
+  };
+
+  // Debug: verifica che le variabili ambiente siano presenti
+  console.log('[DEBUG] Project ID presente:', !!process.env.GOOGLE_PROJECT_ID);
+  console.log('[DEBUG] Private Key presente:', !!process.env.GOOGLE_PRIVATE_KEY);
+  console.log('[DEBUG] Client Email presente:', !!process.env.GOOGLE_CLIENT_EMAIL);
 
   // Autenticazione Google
   const auth = new google.auth.GoogleAuth({
@@ -102,23 +112,28 @@ exports.handler = async (event) => {
 };
 
 /**
- * Netlify Function: update-programma.js
+ * NOTA IMPORTANTE: Questo file conteneva originariamente due exports.handler diversi:
+ * 1. Handler Google Sheets (quello attivo sopra)
+ * 2. Handler File JSON (rimosso per evitare conflitti)
+ * 
+ * I commenti del secondo handler sono conservati qui sotto per riferimento:
+ * 
+ * Scopo del secondo handler: Permetteva di aggiornare in modo sicuro il file programma.json 
+ * lato server tramite una richiesta POST protetta da password admin.
  *
- * Scopo: Permette di aggiornare in modo sicuro il file programma.json lato server tramite una richiesta POST protetta da password admin.
- *
- * Come funziona:
- * - Riceve una richiesta POST con un body JSON: { password, programma }
- * - Controlla che la password sia corretta (usando la variabile ambiente Netlify)
- * - Se la password è giusta, sovrascrive il file programma.json con il nuovo programma
- * - Restituisce 200 OK se tutto va bene, 401 se la password è sbagliata, 500 se c'è un errore interno
+ * Come funzionava:
+ * - Riceveva una richiesta POST con un body JSON: { password, programma }
+ * - Controllava che la password fosse corretta (usando la variabile ambiente Netlify)
+ * - Se la password era giusta, sovrascriveva il file programma.json con il nuovo programma
+ * - Restituiva 200 OK se tutto andava bene, 401 se la password era sbagliata, 500 se c'era un errore interno
  *
  * Ogni riga spiegata:
- * - if (event.httpMethod !== 'POST') ... : accetta solo richieste POST per sicurezza (evita modifiche accidentali via GET)
- * - JSON.parse(event.body): estrae i dati inviati dal client (browser)
- * - if (password !== process.env.VITE_ADMIN_PASSWORD): controlla che la password inviata sia uguale a quella segreta su Netlify
- * - path.join(__dirname, ...): costruisce il percorso assoluto al file da aggiornare
- * - fs.writeFileSync(...): sovrascrive il file con il nuovo contenuto
- * - catch: intercetta e gestisce eventuali errori, restituendo un messaggio chiaro
+ * - if (event.httpMethod !== 'POST') ... : accettava solo richieste POST per sicurezza (evita modifiche accidentali via GET)
+ * - JSON.parse(event.body): estraeva i dati inviati dal client (browser)
+ * - if (password !== process.env.VITE_ADMIN_PASSWORD): controllava che la password inviata fosse uguale a quella segreta su Netlify
+ * - path.join(__dirname, ...): costruiva il percorso assoluto al file da aggiornare
+ * - fs.writeFileSync(...): sovrascriveva il file con il nuovo contenuto
+ * - catch: intercettava e gestiva eventuali errori, restituendo un messaggio chiaro
  *
  * Debug avanzato:
  * - Puoi temporaneamente restituire nel body la password ricevuta e quella di ambiente per capire se c'è un mismatch (come abbiamo fatto con il return JSON di debug)
@@ -137,31 +152,3 @@ exports.handler = async (event) => {
  * - Rimuovi sempre i return di debug e i log sensibili prima di andare in produzione
  * - Commenta il codice per ricordare a te stesso (o ad altri) lo scopo di ogni blocco
  */
-
-exports.handler = async (event) => {
-  // Accetta solo richieste POST
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
-  }
-
-  try {
-    // Estrai password e programma dal body JSON
-    const { password, programma } = JSON.parse(event.body);
-
-    // Controlla la password admin (impostata come variabile ambiente su Netlify)
-    if (password !== process.env.VITE_ADMIN_PASSWORD) {
-      return { statusCode: 401, body: 'Unauthorized' };
-    }
-
-    // Percorso assoluto al file programma.json
-    const filePath = path.join(__dirname, '../../data/programma.json');
-    // Sovrascrivi il file con il nuovo programma
-    fs.writeFileSync(filePath, JSON.stringify(programma, null, 2), 'utf8');
-
-    // Tutto ok
-    return { statusCode: 200, body: 'OK' };
-  } catch (err) {
-    // Errore interno
-    return { statusCode: 500, body: 'Errore: ' + err.message };
-  }
-};
