@@ -1,0 +1,21 @@
+{
+  "name": "kokua-surf-farm",
+  "version": "1.0.0",
+  "description": "Web app per la gestione del programma surf farm",
+  "main": "index.html",
+  "dependencies": {
+    "googleapis": "^144.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "echo 'No build step needed for static site'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Alessio-coder360/kokua-surf-farm.git"
+  },
+  "author": "Alessio",
+  "license": "MIT"
+}
