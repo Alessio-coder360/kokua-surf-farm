@@ -1,4 +1,37 @@
-// Configurazione pubblica (sicura per GitHub)
+// --- Caricamento programma (Google Sheets in produzione, fallback in locale) ---
+async function loadProgram() {
+  try {
+    // Rileva se siamo in locale o produzione
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    
+    if (isLocal) {
+      // In locale: prova prima il file JSON, poi localStorage
+      const res = await fetch('/data/programma.json', { cache: "no-store" });
+      if (!res.ok) throw new Error('Local file not found');
+      const data = await res.json();
+      localStorage.setItem('programma', JSON.stringify(data));
+      return data;
+    } else {
+      // In produzione: usa Google Sheets via Netlify Function
+      const res = await fetch('/.netlify/functions/update-programma', { 
+        method: 'GET',
+        cache: "no-store" 
+      });
+      if (!res.ok) throw new Error('Remote fetch failed');
+      const data = await res.json();
+      localStorage.setItem('programma', JSON.stringify(data));
+      return data;
+    }
+  } catch (e) {
+    // Se fallisce, usa localStorage
+    const local = localStorage.getItem('programma');
+    if (local) return JSON.parse(local);
+    // Se non c'è nulla, restituisci array vuoto
+    return [];
+  }
+}
+
+// --- Configurazione (sicura per GitHub) ---
 let CONFIG = {
     adminPassword: 'demo123', // Fallback per demo - sovrascritto da variabili ambiente
     instagramUrl: 'https://www.instagram.com/kokuasurfarm?igsh=MXhybHYzNmZjcnhveQ%3D%3D&utm_source=qr',
@@ -10,42 +43,32 @@ let CONFIG = {
 };
 
 
-// --- Caricamento programma dal file remoto (con fallback locale) ---
-async function loadProgram() {
-  try {
-    // Prova a caricare dal file remoto
-    const res = await fetch('/data/programma.json', { cache: "no-store" });
-    if (!res.ok) throw new Error('Remote fetch failed');
-    const data = await res.json();
-    // Aggiorna anche localStorage per fallback futuro
-    localStorage.setItem('programma', JSON.stringify(data));
-    return data;
-  } catch (e) {
-    // Se fallisce, usa localStorage
-    const local = localStorage.getItem('programma');
-    if (local) return JSON.parse(local);
-    // Se non c’è nulla, restituisci array vuoto
-    return [];
-  }
-}
 
-// --- Salvataggio programma su Netlify (con fallback locale) ---
+
+
+// --- Salvataggio programma (Google Sheets in produzione, localStorage in locale) ---
 async function saveProgram(programma, adminPassword) {
   try {
-    // Prova a salvare tramite funzione Netlify
-    const res = await fetch('/.netlify/functions/update-programma', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: adminPassword, programma })
-    });
-    if (!res.ok) throw new Error('Remote save failed');
-    // Aggiorna anche localStorage
+    // Rileva se siamo in locale o produzione
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    
+    if (!isLocal) {
+      // In produzione: salva tramite funzione Netlify
+      const res = await fetch('/.netlify/functions/update-programma', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminPassword, programma })
+      });
+      if (!res.ok) throw new Error('Remote save failed');
+    }
+    
+    // Salva sempre anche in localStorage (sia locale che produzione)
     localStorage.setItem('programma', JSON.stringify(programma));
     return true;
   } catch (e) {
-    // Se fallisce, salva solo in localStorage
+    // Se fallisce il salvataggio remoto, salva solo in localStorage
     localStorage.setItem('programma', JSON.stringify(programma));
-    return false;
+    return false; // Indica che il salvataggio remoto è fallito
   }
 }
 
