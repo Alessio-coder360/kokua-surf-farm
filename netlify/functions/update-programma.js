@@ -64,8 +64,17 @@ exports.handler = async (event) => {
       }
 
       // Prepara i dati da scrivere (array di righe)
-      // Esempio: programma = [{time: '08:00', activity: 'Yoga'}, ...]
-      const values = programma.map(row => [row.time, row.activity]);
+      // Gestisce sia oggetti {time, activity} che stringhe "time - activity"
+      const values = programma.map(row => {
+        if (typeof row === 'string') {
+          // Se è una stringa "16:45 - 📸 Attività", la splitta
+          const parts = row.split(' - ');
+          return [parts[0] || '', parts.slice(1).join(' - ') || ''];
+        } else {
+          // Se è un oggetto {time, activity}
+          return [row.time || '', row.activity || ''];
+        }
+      });
       console.log('[DEBUG] Valori da scrivere su Sheets:', values);
 
       // Scrivi su Google Sheets (sul foglio 'Programma', righe da A2 in poi)
