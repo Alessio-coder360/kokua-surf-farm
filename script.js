@@ -850,13 +850,52 @@ async function loadAdminData() {
     }
 
     // Carica quiz multiplo e genera UI dinamica
-    const savedQuiz = localStorage.getItem('surfcamp-quiz');
+    // 🔥 FIX: Carica SEMPRE da Google Sheets in produzione per admin panel
     let quizList = [];
     try {
-        const parsed = savedQuiz ? JSON.parse(savedQuiz) : defaultData.quiz;
-        quizList = Array.isArray(parsed) ? parsed : [parsed];
-    } catch {
-        quizList = defaultData.quiz;
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        
+        if (!isLocal) {
+            // In produzione: carica SEMPRE da Google Sheets per admin panel
+            console.log('[ADMIN] Caricamento quiz da Google Sheets per admin...');
+            const response = await fetch('/.netlify/functions/get-quiz', { cache: "no-store" });
+            if (response.ok) {
+                const sheetsQuiz = await response.json();
+                quizList = Array.isArray(sheetsQuiz) && sheetsQuiz.length > 0 ? sheetsQuiz : defaultData.quiz;
+                console.log('[DEBUG] Admin: Quiz caricati da Google Sheets:', quizList.length, quizList);
+            } else {
+                console.warn('[ADMIN] Google Sheets non raggiungibile, status:', response.status);
+                throw new Error(`Google Sheets get-quiz non disponibile: ${response.status}`);
+            }
+        } else {
+            // In locale: usa localStorage o default (per sviluppo)
+            const savedQuiz = localStorage.getItem('surfcamp-quiz');
+            if (savedQuiz) {
+                try {
+                    const parsed = JSON.parse(savedQuiz);
+                    quizList = Array.isArray(parsed) ? parsed : [parsed];
+                } catch {
+                    quizList = defaultData.quiz;
+                }
+            } else {
+                quizList = defaultData.quiz;
+            }
+            console.log('[DEBUG] Admin: Quiz caricati da localStorage/default:', quizList.length);
+        }
+    } catch (error) {
+        console.warn('[DEBUG] Admin: Fallback a quiz default per errore:', error.message);
+        // Fallback robusto: prova localStorage, poi defaultData
+        const savedQuiz = localStorage.getItem('surfcamp-quiz');
+        if (savedQuiz) {
+            try {
+                const parsed = JSON.parse(savedQuiz);
+                quizList = Array.isArray(parsed) ? parsed : [parsed];
+            } catch {
+                quizList = defaultData.quiz;
+            }
+        } else {
+            quizList = defaultData.quiz;
+        }
     }
     // Nascondi vecchi campi singoli SOLO se esistono
     const qEditor = document.getElementById('quiz-question-editor');

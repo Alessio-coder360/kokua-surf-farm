@@ -1,11 +1,10 @@
-const { GoogleSpreadsheet } = require('googleapis');
+const { google } = require('googleapis');
 
 exports.handler = async (event, context) => {
     try {
         console.log('[DEBUG] get-quiz chiamato');
         
         // Configura Google Sheets client
-        const { google } = require('googleapis');
         const sheets = google.sheets('v4');
         
         // Autenticazione con service account
