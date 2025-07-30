@@ -1,0 +1,38 @@
+[
+    {
+        "question": "Qual è la condizione ideale del vento per il surf?",
+        "options": [
+            "Vento offshore (da terra verso mare)",
+            "Vento onshore (da mare verso terra)",
+            "Vento laterale"
+        ],
+        "correct": "A"
+    },
+    {
+        "question": "Qual è la tavola più adatta per un principiante?",
+        "options": [
+            "Shortboard",
+            "Longboard",
+            "Gun"
+        ],
+        "correct": "B"
+    },
+    {
+        "question": "Cosa significa \"duck dive\"?",
+        "options": [
+            "Tuffarsi sotto l'onda con la tavola",
+            "Saltare sull'onda",
+            "Girare la tavola in aria"
+        ],
+        "correct": "A"
+    },
+    {
+        "question": "Qual è il segnale universale per chiedere aiuto in acqua?",
+        "options": [
+            "Alzare un braccio",
+            "Fischiare",
+            "Battere la tavola sull'acqua"
+        ],
+        "correct": "A"
+    }
+]

@@ -72,6 +72,31 @@ async function saveProgram(programma, adminPassword) {
   }
 }
 
+async function saveQuiz(quiz, adminPassword) {
+  try {
+    // Rileva se siamo in locale o produzione
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    
+    if (!isLocal) {
+      // In produzione: salva tramite funzione Netlify
+      const res = await fetch('/.netlify/functions/update-quiz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminPassword, quiz })
+      });
+      if (!res.ok) throw new Error('Remote quiz save failed');
+    }
+    
+    // Salva sempre anche in localStorage (sia locale che produzione)
+    localStorage.setItem('surfcamp-quiz', JSON.stringify(quiz));
+    return true;
+  } catch (e) {
+    // Se fallisce il salvataggio remoto, salva solo in localStorage
+    localStorage.setItem('surfcamp-quiz', JSON.stringify(quiz));
+    return false; // Indica che il salvataggio remoto è fallito
+  }
+}
+
 // Carica variabili d'ambiente Netlify se disponibili (solo se presenti)
 if (typeof process !== 'undefined' && process.env) {
     CONFIG.adminPassword = process.env.VITE_ADMIN_PASSWORD || CONFIG.adminPassword;
@@ -302,25 +327,67 @@ function renderProgram(program) {
 }
 
 // Gestione quiz
-function loadQuiz() {
-    // Carica quiz multiplo
-    const savedQuiz = localStorage.getItem('surfcamp-quiz');
-    let quizList = [];
-    if (savedQuiz) {
+async function loadQuiz() {
+    // Smart environment detection per quiz
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    
+    if (isLocal) {
+        // Locale: prova prima il file JSON, poi localStorage
+        console.log('[DEBUG] Caricamento quiz in ambiente locale');
         try {
-            const parsed = JSON.parse(savedQuiz);
-            quizList = Array.isArray(parsed) ? parsed : [parsed];
+            const res = await fetch('/data/quiz.json', { cache: "no-store" });
+            if (!res.ok) throw new Error('Local quiz file not found');
+            const data = await res.json();
+            localStorage.setItem('surfcamp-quiz', JSON.stringify(data));
+            appState.quizList = Array.isArray(data) ? data : [data];
         } catch {
-            quizList = defaultData.quiz;
+            // Se fallisce, usa localStorage o defaultData
+            const savedQuiz = localStorage.getItem('surfcamp-quiz');
+            let quizList = [];
+            if (savedQuiz) {
+                try {
+                    const parsed = JSON.parse(savedQuiz);
+                    quizList = Array.isArray(parsed) ? parsed : [parsed];
+                } catch {
+                    quizList = defaultData.quiz;
+                }
+            } else {
+                quizList = defaultData.quiz;
+            }
+            appState.quizList = quizList;
         }
+        appState.quizIndex = 0;
+        appState.quizAnswers = new Array(appState.quizList.length).fill(null);
+        appState.quizSubmitted = false;
+        renderQuiz();
     } else {
-        quizList = defaultData.quiz;
+        // Produzione: carica da Google Sheets
+        console.log('[DEBUG] Caricamento quiz da Google Sheets');
+        fetch('/.netlify/functions/get-quiz')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Errore caricamento quiz: ' + response.status);
+                }
+                return response.json();
+            })
+            .then(quizData => {
+                console.log('[DEBUG] Quiz caricati da Google Sheets:', quizData);
+                appState.quizList = Array.isArray(quizData) && quizData.length > 0 ? quizData : defaultData.quiz;
+                appState.quizIndex = 0;
+                appState.quizAnswers = new Array(appState.quizList.length).fill(null);
+                appState.quizSubmitted = false;
+                renderQuiz();
+            })
+            .catch(error => {
+                console.error('[ERROR] Errore caricamento quiz da Google Sheets:', error);
+                // Fallback ai dati locali
+                appState.quizList = defaultData.quiz;
+                appState.quizIndex = 0;
+                appState.quizAnswers = new Array(appState.quizList.length).fill(null);
+                appState.quizSubmitted = false;
+                renderQuiz();
+            });
     }
-    appState.quizList = quizList;
-    appState.quizIndex = 0;
-    appState.quizAnswers = new Array(quizList.length).fill(null);
-    appState.quizSubmitted = false;
-    renderQuiz();
 }
 
 // Rendering quiz carosello
@@ -933,7 +1000,14 @@ async function saveSettings() {
                 quizList.push({question:q,options:opts,correct});
             }
         });
-        localStorage.setItem('surfcamp-quiz', JSON.stringify(quizList));
+        
+        // Usa la nuova funzione saveQuiz per salvare sia locale che remoto
+        const quizSuccess = await saveQuiz(quizList, passwordToUse);
+        if (quizSuccess) {
+            console.log('[DEBUG] Quiz salvati su remoto:', quizList);
+        } else {
+            console.log('[DEBUG] Quiz salvati solo in localStorage:', quizList);
+        }
     } else {
         // fallback: salva singola domanda (retrocompatibilità)
         const quizData = {
@@ -945,7 +1019,14 @@ async function saveSettings() {
             ],
             correct: document.getElementById('quiz-correct').value
         };
-        localStorage.setItem('surfcamp-quiz', JSON.stringify(quizData));
+        
+        // Usa la nuova funzione saveQuiz per il fallback
+        const quizFallbackSuccess = await saveQuiz([quizData], passwordToUse);
+        if (quizFallbackSuccess) {
+            console.log('[DEBUG] Quiz fallback salvato su remoto:', quizData);
+        } else {
+            console.log('[DEBUG] Quiz fallback salvato solo in localStorage:', quizData);
+        }
     }
 
     // Ricarica la pagina con i nuovi dati
