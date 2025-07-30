@@ -880,7 +880,27 @@ async function saveSettings() {
     const passwordToUse = adminPasswordInput ? adminPasswordInput.value : CONFIG.adminPassword;
     // Salva il programma sia su remoto (Netlify Function) che in localStorage (fallback)
     if (Array.isArray(appState.tempProgram)) {
-        const cleanProgram = appState.tempProgram.filter(line => line && line.trim());
+        console.log('[DEBUG] saveSettings - tempProgram:', appState.tempProgram);
+        console.log('[DEBUG] saveSettings - sample item type:', typeof appState.tempProgram[0]);
+        
+        // Filtra gli elementi vuoti, gestendo sia formato oggetto che stringa
+        const cleanProgram = appState.tempProgram.filter(item => {
+            if (!item) return false;
+            
+            // Se è un oggetto con time e activity
+            if (typeof item === 'object' && item.time && item.activity) {
+                return item.time.trim() && item.activity.trim();
+            }
+            
+            // Se è una stringa (formato dopo editing dell'utente)
+            if (typeof item === 'string') {
+                return item.trim() !== '';
+            }
+            
+            return false;
+        });
+        
+        console.log('[DEBUG] saveSettings - cleanProgram:', cleanProgram);
         // Prova a salvare su remoto, fallback automatico su localStorage
         const success = await saveProgram(cleanProgram, passwordToUse);
         if (success) {
