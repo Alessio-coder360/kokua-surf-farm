@@ -707,14 +707,27 @@ async function loadAdminData() {
             </thead>
             <tbody>`;
         safeProgram.forEach((row, idx) => {
-            const match = row.match(/^([0-9]{2}:[0-9]{2})\s*-\s*(.+)$/);
             let time = '', activity = '';
-            if (match) {
-                time = match[1];
-                activity = match[2];
+            
+            // 🔥 FIX: Gestisci sia formato oggetto che stringa
+            if (typeof row === 'object' && row.time && row.activity) {
+                // Nuovo formato oggetto da Google Sheets
+                time = row.time;
+                activity = row.activity;
+            } else if (typeof row === 'string') {
+                // Vecchio formato stringa
+                const match = row.match(/^([0-9]{2}:[0-9]{2})\s*-\s*(.+)$/);
+                if (match) {
+                    time = match[1];
+                    activity = match[2];
+                } else {
+                    time = '';
+                    activity = row;
+                }
             } else {
+                // Fallback
                 time = '';
-                activity = row;
+                activity = String(row || '');
             }
             tableHtml += `<tr>
                 <td><input type="text" class="program-time-input w-full p-1 rounded text-xs" value="${time}" data-idx="${idx}"></td>
