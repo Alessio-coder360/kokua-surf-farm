@@ -68,15 +68,15 @@ exports.handler = async (event, context) => {
         
         console.log('[DEBUG] Righe da scrivere nel foglio Quiz:', values.length);
         
-        // Pulisci e riscrivi tutto il foglio Quiz
+        // Pulisci e riscrivi tutto il foglio Surfcamp Quiz
         await sheets.spreadsheets.values.clear({
             spreadsheetId: SPREADSHEET_ID,
-            range: 'Quiz!A:E',
+            range: 'Surfcamp Quiz!A:E',
         });
         
         await sheets.spreadsheets.values.update({
             spreadsheetId: SPREADSHEET_ID,
-            range: 'Quiz!A1',
+            range: 'Surfcamp Quiz!A1',
             valueInputOption: 'RAW',
             requestBody: {
                 values: values

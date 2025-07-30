@@ -20,7 +20,7 @@
     <div id="app">
         <!-- Header -->
         <header class="text-center py-8 text-white">
-            <h1 class="text-4xl font-bold mb-2">ðŸ„â€â™‚ï¸ KOKUA SURF FARM</h1>
+            <h1 class="text-4xl font-bold mb-2">🏄‍♂️ KOKUA SURF FARM</h1>
             <p class="text-xl opacity-90">Programma Giornaliero</p>
         </header>
         <!-- Contenuto Principale -->
@@ -56,13 +56,13 @@
                     Feedback
                 </h2>
                 <div class="text-center">
-                    <p class="text-white mb-4">Come Ã¨ andata la tua sessione di surf oggi?</p>
+                    <p class="text-white mb-4">Come è andata la tua sessione di surf oggi?</p>
                     <div class="flex justify-center space-x-4 mb-6">
-                        <button class="feedback-btn text-4xl hover:scale-110 transition-transform" data-rating="1">ðŸ˜ž</button>
-                        <button class="feedback-btn text-4xl hover:scale-110 transition-transform" data-rating="2">ðŸ˜</button>
-                        <button class="feedback-btn text-4xl hover:scale-110 transition-transform" data-rating="3">ðŸ˜Š</button>
-                        <button class="feedback-btn text-4xl hover:scale-110 transition-transform" data-rating="4">ðŸ¤©</button>
-                        <button class="feedback-btn text-4xl hover:scale-110 transition-transform" data-rating="5">ðŸ„â€â™‚ï¸</button>
+                        <button class="feedback-btn text-4xl hover:scale-110 transition-transform" data-rating="1">😞</button>
+                        <button class="feedback-btn text-4xl hover:scale-110 transition-transform" data-rating="2">😐</button>
+                        <button class="feedback-btn text-4xl hover:scale-110 transition-transform" data-rating="3">😊</button>
+                        <button class="feedback-btn text-4xl hover:scale-110 transition-transform" data-rating="4">🤩</button>
+                        <button class="feedback-btn text-4xl hover:scale-110 transition-transform" data-rating="5">🏄‍♂️</button>
                     </div>
                     <button id="submit-feedback" class="bg-pink-500 hover:bg-pink-600 text-white px-6 py-3 rounded-full font-bold transition-colors">
                         <i class="fab fa-instagram mr-2"></i>
@@ -93,14 +93,14 @@
         <!-- Admin Panel (compatto e migliorato) -->
         <div id="admin-panel" class="fixed inset-0 bg-black/80 flex items-center justify-center hidden z-50 p-4">
             <div class="bg-white rounded-xl p-8 max-w-2xl w-full overflow-y-auto">
-                <h3 class="text-lg font-bold mb-3 text-center">ðŸ”’ Admin Panel</h3>
+                <h3 class="text-lg font-bold mb-3 text-center">🔒 Admin Panel</h3>
                 <!-- Sezione Login (nascosta dopo accesso) -->
                 <div id="admin-login-section" class="mb-4">
                     <input type="password" id="admin-password" class="w-full p-2 border rounded-lg text-sm mb-2" placeholder="Password admin">
                     <button id="admin-login" class="w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 text-sm">
-                        ðŸ” Accedi
+                        🔐 Accedi
                     </button>
-                    <button id="close-admin-login" class="w-full bg-blue-100 text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-200 text-sm mt-2 flex items-center justify-center font-bold"><span class="mr-2">ðŸ”™</span>Chiudi (Logout)</button>
+                    <button id="close-admin-login" class="w-full bg-blue-100 text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-200 text-sm mt-2 flex items-center justify-center font-bold"><span class="mr-2">🔙</span>Chiudi (Logout)</button>
                 </div>
                 <!-- Contenuto Admin (visibile dopo login) -->
                 <div id="admin-content" class="hidden">
@@ -111,36 +111,36 @@
                     </div>
                     <!-- Sezioni a carosello -->
                     <div id="admin-section-program" class="admin-section">
-            <div class="mb-4">
-              <label class="block text-xs font-bold mb-1 text-blue-400">Programma giornaliero</label>
-              <textarea id="program-editor" class="w-full h-32 p-2 rounded bg-white/10 text-white text-xs font-mono mb-2" placeholder="Orario - AttivitÃ \n08:00 - Yoga\n09:00 - Colazione\n..." autocomplete="off"></textarea>
-              <div id="program-table-editor" class="mt-2"></div>
-            </div>
+                        <div class="mb-4">
+                            <label class="block text-xs font-bold mb-1 text-blue-400">Programma giornaliero</label>
+                            <textarea id="program-editor" class="w-full h-32 p-2 rounded bg-white/10 text-white text-xs font-mono mb-2" placeholder="Orario - Attività \n08:00 - Yoga\n09:00 - Colazione\n..." autocomplete="off"></textarea>
+                            <div id="program-table-editor" class="mt-2"></div>
+                        </div>
                         <!-- Nessuna freccia, solo tab -->
                     </div>
                     <div id="admin-section-quiz" class="admin-section hidden">
-        <div class="mb-3">
-            <label class="block text-sm font-medium mb-1">â“ Quiz:</label>
-            <div id="quiz-multi-editor" class="max-h-[350px] overflow-y-auto space-y-2 p-1 bg-white/10 rounded-lg">
-                <!-- Le domande e risposte saranno generate qui via JS -->
-                <!-- coming soon: aggiungi domanda -->
-            </div>
-            <div class="flex justify-end pt-2">
-                <button id="save-settings" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 text-sm">ðŸ’¾ Salva</button>
-            </div>
-        </div>
+                        <div class="mb-3">
+                            <label class="block text-sm font-medium mb-1">❓ Quiz:</label>
+                            <div id="quiz-multi-editor" class="max-h-[350px] overflow-y-auto space-y-2 p-1 bg-white/10 rounded-lg">
+                                <!-- Le domande e risposte saranno generate qui via JS -->
+                                <!-- coming soon: aggiungi domanda -->
+                            </div>
+                            <div class="flex justify-end pt-2">
+                                <button id="save-settings" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 text-sm">💾 Salva</button>
+                            </div>
+                        </div>
                         <!-- Nessuna freccia, solo tab -->
                     </div>
                     <!-- Sezione Instagram rimossa -->
                     <div class="flex space-x-2 pt-4">
-                        <button id="close-admin" class="flex-1 bg-red-500 text-white px-3 py-2 rounded-lg hover:bg-red-600 text-sm font-bold flex items-center justify-center"><span class="mr-2">âŒ</span>Chiudi (Annulla modifiche)</button>
+                        <button id="close-admin" class="flex-1 bg-red-500 text-white px-3 py-2 rounded-lg hover:bg-red-600 text-sm font-bold flex items-center justify-center"><span class="mr-2">❌</span>Chiudi (Annulla modifiche)</button>
                     </div>
                 </div>
                 <!-- Bottone chiudi sempre visibile rimosso, ora gestito sopra -->
             </div>
         </div>
     </div>
-    <!-- ðŸ” Carica configurazione privata (se esiste) -->
+    <!-- 🔧 Carica configurazione privata (se esiste) -->
     <script>
         // Caricamento opzionale del config privato (solo in locale)
         const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';

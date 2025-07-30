@@ -99,6 +99,153 @@ Per sincronizzare con Google Sheets:
 
 ## 📱 Compatibilità
 
+- ✅ Chrome (Desktop/Mobile)
+- ✅ Firefox (Desktop/Mobile)  
+- ✅ Safari (iOS/macOS)
+- ✅ Edge (Windows)
+
+## 🔧 COMANDI TERMINALI AVANZATI
+
+### 🚨 Diagnostica Problemi File Corrotti
+
+#### 1. Controllo Stato Repository Git
+```bash
+git status
+```
+**Cosa mostra:** File modificati, aggiunti, cancellati  
+**Quando usare:** Sempre prima di fare modifiche importanti  
+**Come interpretare:**
+- `modified:` = file cambiato
+- `untracked:` = file nuovo
+- `deleted:` = file cancellato
+- `nothing to commit` = tutto pulito
+
+#### 2. Vedere Prime Righe di un File
+```bash
+Get-Content nomefile.html | Select-Object -First 10
+```
+**Cosa mostra:** Prime 10 righe del file  
+**Quando usare:** Quando sospetti che un file sia corrotto  
+**Come interpretare:**
+- Se vedi HTML normale = file OK
+- Se vedi codice mescolato = file corrotto
+- Se manca `<!DOCTYPE html>` = problema grave
+
+#### 3. Controllo Dimensione File
+```bash
+Get-ChildItem *.html | Format-Table Name, Length
+```
+**Cosa mostra:** Nome e dimensione dei file HTML  
+**Quando usare:** Per confrontare file prima/dopo modifiche  
+**Come interpretare:**
+- Dimensioni simili = probabilmente OK
+- Dimensione 0 bytes = file vuoto (problema!)
+- Dimensione molto diversa = possibile corruzione
+
+#### 4. Backup Automatico Prima di Modifiche
+```bash
+Copy-Item index.html index_backup_$(Get-Date -Format "yyyyMMdd_HHmmss").html
+```
+**Cosa fa:** Crea copia di sicurezza con timestamp  
+**Quando usare:** SEMPRE prima di modifiche importanti  
+**Come interpretare:** Avrai sempre una versione funzionante
+
+### 🔄 Ripristino da Problemi
+
+#### 5. Tornare alla Versione Git Pulita
+```bash
+git checkout -- nomefile.html
+```
+**Cosa fa:** Ripristina file alla versione salvata in Git  
+**Quando usare:** Quando un file è corrotto ma Git ha versione buona  
+**ATTENZIONE:** Perdi TUTTE le modifiche non salvate!
+
+#### 6. Reset Completo del Repository
+```bash
+git reset --hard HEAD
+```
+**Cosa fa:** Ripristina TUTTI i file alla versione Git  
+**Quando usare:** Emergenza totale, tutto corrotto  
+**ATTENZIONE:** Perdi TUTTE le modifiche non salvate!
+
+#### 7. Mettere da Parte Modifiche Problematiche
+```bash
+git stash push -m "descrizione_problema"
+```
+**Cosa fa:** Salva modifiche senza committare  
+**Quando usare:** Hai modifiche che non vuoi perdere ma causano problemi  
+**Come recuperare:** `git stash pop`
+
+### 📥 Download File da GitHub
+
+#### 8. Scaricare File Specifico da GitHub
+```bash
+curl -o nomefile_nuovo.html "https://raw.githubusercontent.com/TUO_USERNAME/TUO_REPO/main/nomefile.html"
+```
+**Cosa fa:** Scarica versione pulita da GitHub  
+**Quando usare:** Quando file locale è corrotto ma GitHub è OK  
+**Sostituisci:** TUO_USERNAME, TUO_REPO, nomefile con i tuoi valori
+
+#### 9. Sostituire File Corrotto
+```bash
+del nomefile.html
+move nomefile_nuovo.html nomefile.html
+```
+**Cosa fa:** Elimina file corrotto e sostituisce con quello nuovo  
+**Quando usare:** Dopo aver scaricato versione pulita  
+**ATTENZIONE:** Controlla che il nuovo file sia corretto prima!
+
+### 🆕 Creare File da Zero
+
+#### 10. Creare Nuovo File Vuoto
+```bash
+New-Item -ItemType File -Name "nomefile.html"
+```
+**Cosa fa:** Crea file vuoto  
+**Quando usare:** Quando devi ricreare un file completamente  
+
+#### 11. Copiare Contenuto tra File
+```bash
+Get-Content file_sorgente.html | Set-Content file_destinazione.html
+```
+**Cosa fa:** Copia tutto il contenuto da un file all'altro  
+**Quando usare:** Per duplicare file funzionanti  
+
+### 🔍 Diagnosi Avanzata
+
+#### 12. Cercare Testo Specifico nei File
+```bash
+Select-String -Path "*.html" -Pattern "testo_da_cercare"
+```
+**Cosa mostra:** Righe che contengono il testo cercato  
+**Quando usare:** Per trovare codice specifico o problemi  
+
+#### 13. Confrontare Due File
+```bash
+Compare-Object (Get-Content file1.html) (Get-Content file2.html)
+```
+**Cosa mostra:** Differenze tra due file  
+**Quando usare:** Per capire cosa è cambiato tra versioni  
+
+### 📋 Checklist Risoluzione Problemi
+
+1. **SEMPRE fare backup prima di modifiche**
+2. **Usare `git status` per capire la situazione**
+3. **Controllare prime righe file con `Get-Content`**
+4. **Se file corrotto: provare `git checkout --`**
+5. **Se problema persiste: `git reset --hard HEAD`**
+6. **Come ultima risorsa: scaricare da GitHub**
+7. **Testare sempre il file riparato prima del commit**
+
+### ⚠️ REGOLE D'ORO
+
+- **Mai modificare file importanti senza backup**
+- **Mai usare `git reset --hard` senza essere sicuri**
+- **Sempre verificare che un file funzioni prima di sostituirlo**
+- **Tenere sempre una copia funzionante da qualche parte**
+
+## 📱 Compatibilità
+
 - ✅ Chrome, Firefox, Safari, Edge
 - ✅ iPhone, Android
 - ✅ Tablet e Desktop
