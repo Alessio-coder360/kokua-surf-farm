@@ -17,7 +17,10 @@ async function loadProgram() {
         method: 'GET',
         cache: "no-store" 
       });
-      if (!res.ok) throw new Error('Remote fetch failed');
+      if (!res.ok)    // 🔥 MOSTRA SPINNER SURF THEME
+    showSurfSpinner('🏄‍♂️ Salvando il nuovo programma...');
+
+    // Usa sempre la password inserita dall'utente adminthrow new Error('Remote fetch failed');
       const data = await res.json();
       localStorage.setItem('programma', JSON.stringify(data));
       return data;
@@ -670,14 +673,23 @@ function handleAdminLogin() {
     });
 }
 
-function loadAdminData() {
+async function loadAdminData() {
     // Collega il bottone Salva dopo aver generato la UI admin
     const saveBtn = document.getElementById('save-settings');
     if (saveBtn) saveBtn.onclick = saveSettings;
-    // Carica programma corrente SOLO la prima volta o se tempProgram è nullo
+    
+    // 🔥 FIX: Carica SEMPRE i dati attuali dal DOM/backend, non da localStorage
     if (!appState.tempProgram) {
-        const savedProgram = localStorage.getItem('surfcamp-program');
-        appState.tempProgram = savedProgram ? JSON.parse(savedProgram) : [...defaultData.program];
+        try {
+            // Carica i dati attuali dalla stessa fonte del frontend
+            const currentProgram = await loadProgram();
+            appState.tempProgram = Array.isArray(currentProgram) && currentProgram.length 
+                ? [...currentProgram] 
+                : [...defaultData.program];
+        } catch (e) {
+            console.warn('[ADMIN] Fallback ai dati di default:', e);
+            appState.tempProgram = [...defaultData.program];
+        }
     }
     const program = appState.tempProgram;
     // Editor tabellare per time/activity
@@ -845,7 +857,7 @@ function loadAdminData() {
     // Sezione Instagram rimossa
 }
 
-function saveSettings() {
+async function saveSettings() {
     console.log('[DEBUG] saveSettings chiamato');
     console.log('[DEBUG] closeAdminPanel chiamato');
     const saveBtn = document.getElementById('save-settings');
@@ -860,15 +872,14 @@ function saveSettings() {
     if (Array.isArray(appState.tempProgram)) {
         const cleanProgram = appState.tempProgram.filter(line => line && line.trim());
         // Prova a salvare su remoto, fallback automatico su localStorage
-        saveProgram(cleanProgram, passwordToUse).then(success => {
-            if (success) {
-                console.log('[DEBUG] Programma salvato su remoto:', cleanProgram);
-            } else {
-                console.log('[DEBUG] Programma salvato solo in localStorage:', cleanProgram);
-            }
-            // Dopo il salvataggio, aggiorna la vista pubblica
-            loadProgram().then(programma => renderProgram(programma));
-        });
+        const success = await saveProgram(cleanProgram, passwordToUse);
+        if (success) {
+            console.log('[DEBUG] Programma salvato su remoto:', cleanProgram);
+        } else {
+            console.log('[DEBUG] Programma salvato solo in localStorage:', cleanProgram);
+        }
+        // Dopo il salvataggio, aggiorna la vista pubblica
+        await loadProgram().then(programma => renderProgram(programma));
     }
     // Reset tempProgram per evitare modifiche non salvate
     appState.tempProgram = null;
@@ -903,17 +914,73 @@ function saveSettings() {
     }
 
     // Ricarica la pagina con i nuovi dati
-    loadProgram();
-    loadQuiz();
+    await loadProgram();
+    await loadQuiz();
+    
+    // 🔥 NASCONDI SPINNER E MOSTRA SUCCESSO
+    hideSurfSpinner();
     showNotification('💾 Impostazioni salvate con successo!', 'success');
+    
     setTimeout(() => {
         closeAdminPanel();
         console.log('[DEBUG] Pannello admin chiuso dopo salvataggio programma');
-    }, 300);
+    }, 800);
 }
 
 function loadSettings() {
     // Questa funzione può essere espansa per caricare impostazioni aggiuntive
+}
+
+// 🏄‍♂️ SPINNER SURF THEMED
+function showSurfSpinner(message = '🏄‍♂️ Loading...') {
+    // Rimuovi spinner esistenti
+    hideSurfSpinner();
+    
+    const spinner = document.createElement('div');
+    spinner.id = 'surf-spinner';
+    spinner.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    
+    spinner.innerHTML = `
+        <div class="bg-gradient-to-br from-blue-500 to-cyan-400 p-8 rounded-2xl shadow-2xl text-center max-w-sm mx-4">
+            <div class="surf-wave-animation mb-4">
+                <div class="relative">
+                    <div class="w-16 h-16 mx-auto">
+                        <svg class="animate-spin w-full h-full text-white" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </div>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <span class="text-3xl animate-bounce">🏄‍♂️</span>
+                    </div>
+                </div>
+            </div>
+            <div class="text-white font-bold text-lg mb-2">${message}</div>
+            <div class="flex justify-center space-x-1">
+                <div class="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                <div class="w-2 h-2 bg-white rounded-full animate-pulse" style="animation-delay: 0.2s"></div>
+                <div class="w-2 h-2 bg-white rounded-full animate-pulse" style="animation-delay: 0.4s"></div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(spinner);
+    
+    // Animazione di entrata
+    setTimeout(() => {
+        spinner.style.opacity = '1';
+    }, 10);
+}
+
+function hideSurfSpinner() {
+    const spinner = document.getElementById('surf-spinner');
+    if (spinner) {
+        spinner.style.opacity = '0';
+        spinner.style.transform = 'scale(0.9)';
+        setTimeout(() => {
+            spinner.remove();
+        }, 300);
+    }
 }
 
 // Utility functions
