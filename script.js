@@ -874,6 +874,11 @@ async function saveSettings() {
     if (saveBtn) saveBtn.addEventListener('click', saveSettings);
     if (!appState.isAdminLoggedIn) return;
 
+    // Mostra spinner del surf durante il salvataggio
+    showSurfSpinner('🏄‍♂️ Salvando...');
+
+    try {
+
 
     // Usa sempre la password inserita dall’utente admin
     const adminPasswordInput = document.getElementById('admin-password');
@@ -955,6 +960,12 @@ async function saveSettings() {
         closeAdminPanel();
         console.log('[DEBUG] Pannello admin chiuso dopo salvataggio programma');
     }, 800);
+    
+    } catch (error) {
+        console.error('[ERROR] Errore durante il salvataggio:', error);
+        hideSurfSpinner();
+        showNotification('❌ Errore durante il salvataggio: ' + error.message, 'error');
+    }
 }
 
 function loadSettings() {
