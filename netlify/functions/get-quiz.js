@@ -25,10 +25,10 @@ exports.handler = async (event, context) => {
         // ID del foglio Google Sheets Quiz
         const SPREADSHEET_ID = '1zEtEXkGwcMXkNzLD8vWpkr8EVnkBbG2bc_j-2vApU3A';
         
-        // Leggi i dati dal foglio "Quiz" (A:E = question, option1, option2, option3, correct)
+        // Leggi i dati dal foglio "Surfcamp Quiz" (A:E = question, option1, option2, option3, correct)
         const response = await sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
-            range: 'Quiz!A:E', // Foglio "Quiz" colonne A-E
+            range: 'Surfcamp Quiz!A:E', // Foglio "Surfcamp Quiz" colonne A-E
         });
         
         const rows = response.data.values || [];
