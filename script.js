@@ -17,10 +17,7 @@ async function loadProgram() {
         method: 'GET',
         cache: "no-store" 
       });
-      if (!res.ok)    // 🔥 MOSTRA SPINNER SURF THEME
-    showSurfSpinner('🏄‍♂️ Salvando il nuovo programma...');
-
-    // Usa sempre la password inserita dall'utente adminthrow new Error('Remote fetch failed');
+      if (!res.ok) throw new Error('Remote fetch failed');
       const data = await res.json();
       localStorage.setItem('programma', JSON.stringify(data));
       return data;
@@ -678,7 +675,7 @@ async function loadAdminData() {
     const saveBtn = document.getElementById('save-settings');
     if (saveBtn) saveBtn.onclick = saveSettings;
     
-    // 🔥 FIX: Carica SEMPRE i dati attuali dal DOM/backend, non da localStorage
+    // 🔥 FIX: Carica dati attuali SOLO la prima volta che apri l'admin
     if (!appState.tempProgram) {
         try {
             // Carica i dati attuali dalla stessa fonte del frontend
